@@ -15,6 +15,7 @@ import {
 import { db } from '../firebase';
 import { Reservation, Driver, Vehicle, Service, Customer, Transaction } from '../types';
 import { mockDrivers, mockVehicles, mockServices, mockReservations } from './mockData';
+import { reservationService as firebaseReservationService } from './reservationService';
 
 // Check if Firebase is available
 const isFirebaseAvailable = () => {
@@ -163,15 +164,29 @@ export const transactionService = new CRUDService<Transaction>('transactions', [
 
 // Extended Reservation Service
 export const extendedReservationService = {
-  ...reservationService,
+  // Use Firebase service if available, fallback to CRUD
+  async getAll() {
+    if (isFirebaseAvailable()) {
+      try {
+        return await firebaseReservationService.getReservations();
+      } catch (error) {
+        console.error('Firebase error, using fallback:', error);
+      }
+    }
+    return reservationService.getAll();
+  },
 
   async assignDriver(reservationId: string, driverId: string): Promise<void> {
     try {
-      await reservationService.update(reservationId, {
-        driverId,
-        status: 'assigned' as const,
-        updatedAt: new Date()
-      });
+      if (isFirebaseAvailable()) {
+        await firebaseReservationService.updateReservationStatus(reservationId, 'assigned', driverId);
+      } else {
+        await reservationService.update(reservationId, {
+          driverId,
+          status: 'assigned' as const,
+          updatedAt: new Date()
+        });
+      }
     } catch (error) {
       console.error('Error assigning driver:', error);
       throw error;

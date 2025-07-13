@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { reservationService, driverService } from '../../../lib/services/reservationService';
+import { NotificationService } from '../../../lib/services/notificationService';
 
 export default function AdminDashboard() {
   const [reservations, setReservations] = useState<any[]>([]);
@@ -118,26 +120,62 @@ export default function AdminDashboard() {
   ];
 
   useEffect(() => {
-    setReservations(mockReservations);
-    setDrivers(mockDrivers);
+    loadData();
+    
+    // Real-time reservations listener
+    const unsubscribe = reservationService.onReservationsChange((newReservations) => {
+      setReservations(newReservations);
+    });
+    
+    return () => unsubscribe();
   }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [reservationsData, driversData] = await Promise.all([
+        reservationService.getReservations(),
+        driverService.getDrivers()
+      ]);
+      setReservations(reservationsData);
+      setDrivers(driversData);
+    } catch (error) {
+      toast.error('Veriler yüklenirken hata oluştu');
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAssignDriver = async (driverId: string) => {
     if (!selectedReservation) return;
     
     try {
-      // Update reservation status
-      setReservations(prev => prev.map(res => 
-        res.id === selectedReservation.id 
-          ? { ...res, status: 'assigned', assignedDriver: drivers.find(d => d.id === driverId)?.name }
-          : res
-      ));
+      // Update reservation in Firebase
+      await reservationService.updateReservationStatus(
+        selectedReservation.id, 
+        'assigned', 
+        driverId
+      );
+      
+      // Send notification to driver
+      const driver = drivers.find(d => d.id === driverId);
+      if (driver) {
+        await NotificationService.sendDriverNotification(driverId, selectedReservation);
+        
+        // Send customer notification with driver info
+        await NotificationService.sendCustomerNotification(
+          selectedReservation.customerId || 'customer1',
+          `Şoförünüz atandı: ${driver.name} - ${driver.phone}`
+        );
+      }
       
       setShowAssignModal(false);
       setSelectedReservation(null);
-      toast.success('🎉 Şoför başarıyla atandı!');
+      toast.success('🎉 Şoför başarıyla atandı ve bildirim gönderildi!');
     } catch (error) {
       toast.error('❌ Şoför atanırken hata oluştu.');
+      console.error('Driver assignment error:', error);
     }
   };
 

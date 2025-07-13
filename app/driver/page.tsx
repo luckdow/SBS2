@@ -30,6 +30,7 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import QRScanner from '../../components/ui/QRScanner';
+import { reservationService } from '../../lib/services/reservationService';
 import { NotificationService } from '../../lib/services/notificationService';
 
 export default function DriverPanel() {
@@ -98,23 +99,47 @@ export default function DriverPanel() {
   ];
 
   useEffect(() => {
-    setReservations(mockReservations);
+    loadDriverReservations();
+    
+    // Real-time listener for driver reservations
+    const unsubscribe = reservationService.onReservationsChange((allReservations) => {
+      const driverReservations = allReservations.filter(res => 
+        res.assignedDriver === driverId && 
+        ['assigned', 'started'].includes(res.status)
+      );
+      setReservations(driverReservations);
+    });
+    
+    return () => unsubscribe();
   }, []);
+
+  const loadDriverReservations = async () => {
+    try {
+      setLoading(true);
+      const driverReservations = await reservationService.getDriverReservations(driverId);
+      setReservations(driverReservations);
+    } catch (error) {
+      console.error('Error loading driver reservations:', error);
+      // Fallback to mock data
+      setReservations(mockReservations);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleStartTrip = async (reservationId: string) => {
     try {
-      setReservations(prev => prev.map(res => 
-        res.id === reservationId ? { ...res, status: 'started' } : res
-      ));
+      await reservationService.updateReservationStatus(reservationId, 'started');
       toast.success('🚗 Yolculuk başlatıldı!');
     } catch (error) {
       toast.error('❌ Yolculuk başlatılırken hata oluştu.');
+      console.error('Start trip error:', error);
     }
   };
 
   const handleCompleteTrip = async (reservationId: string) => {
     try {
-      setReservations(prev => prev.filter(res => res.id !== reservationId));
+      await reservationService.updateReservationStatus(reservationId, 'completed');
       setDriverStats(prev => ({ ...prev, todayTrips: prev.todayTrips + 1 }));
       
       // Send completion notification
@@ -126,6 +151,7 @@ export default function DriverPanel() {
       toast.success('✅ Yolculuk tamamlandı!');
     } catch (error) {
       toast.error('❌ Yolculuk tamamlanırken hata oluştu.');
+      console.error('Complete trip error:', error);
     }
   };
 
