@@ -8,7 +8,8 @@ import {
   query,
   orderBy,
   where,
-  Timestamp 
+  Timestamp,
+  getDoc 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
