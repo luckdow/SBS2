@@ -29,12 +29,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import QRScanner from '../../components/ui/QRScanner';
+import { NotificationService } from '../../lib/services/notificationService';
 
 export default function DriverPanel() {
   const [reservations, setReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [scanResult, setScanResult] = useState<string>('');
   const [driverStats, setDriverStats] = useState({
     todayTrips: 3,
     weeklyTrips: 18,
@@ -113,12 +116,36 @@ export default function DriverPanel() {
     try {
       setReservations(prev => prev.filter(res => res.id !== reservationId));
       setDriverStats(prev => ({ ...prev, todayTrips: prev.todayTrips + 1 }));
+      
+      // Send completion notification
+      await NotificationService.sendCustomerNotification(
+        'customer1', 
+        'Yolculuğunuz tamamlandı. Teşekkür ederiz!'
+      );
+      
       toast.success('✅ Yolculuk tamamlandı!');
     } catch (error) {
       toast.error('❌ Yolculuk tamamlanırken hata oluştu.');
     }
   };
 
+  const handleQRScan = (data: string) => {
+    try {
+      const qrData = JSON.parse(data);
+      const reservationId = qrData.reservationId;
+      
+      // Find and start the trip
+      const reservation = reservations.find(res => res.id === reservationId);
+      if (reservation) {
+        handleStartTrip(reservationId);
+        toast.success('🎉 QR kod başarıyla okundu! Yolculuk başlatıldı.');
+      } else {
+        toast.error('❌ Geçersiz QR kod!');
+      }
+    } catch (error) {
+      toast.error('❌ QR kod okunamadı!');
+    }
+  };
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'assigned': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -447,50 +474,11 @@ export default function DriverPanel() {
       </div>
 
       {/* QR Scanner Modal */}
-      <AnimatePresence>
-        {showQRScanner && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6 max-w-md w-full mx-4"
-            >
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center space-x-2">
-                <QrCode className="h-6 w-6" />
-                <span>QR Kod Okuyucu</span>
-              </h3>
-              
-              <div className="bg-white/5 rounded-2xl p-8 text-center mb-6">
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Camera className="h-10 w-10 text-white" />
-                </div>
-                <p className="text-white/80 mb-2">QR kod okuyucu burada olacak</p>
-                <p className="text-white/60 text-sm">
-                  Müşterinin QR kodunu kameraya tutun
-                </p>
-              </div>
-              
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowQRScanner(false)}
-                  className="flex-1 bg-white/10 backdrop-blur-md border border-white/30 text-white px-4 py-3 rounded-xl hover:bg-white/20 transition-all duration-300"
-                >
-                  İptal
-                </button>
-                <button className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300">
-                  Kodu Onayla
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <QRScanner
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={handleQRScan}
+      />
     </div>
   );
 }

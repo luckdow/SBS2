@@ -28,6 +28,10 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
+import { GoogleMapsService } from '../../lib/services/googleMaps';
+import { EmailService } from '../../lib/services/emailService';
+import { AuthService } from '../../lib/services/authService';
+import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -109,28 +113,51 @@ export default function ReservationPage() {
   ];
 
   const handleRouteNext = (routeData: any) => {
+    // Calculate distance using Google Maps
+    GoogleMapsService.calculateDistance(routeData.from, routeData.to)
+      .then(result => {
+        setReservationData(prev => ({ 
+          ...prev, 
+          ...routeData, 
+          distance: result.distance,
+          estimatedDuration: result.duration
+        }));
+        setCurrentStep(2);
+      })
+      .catch(error => {
+        console.error('Distance calculation error:', error);
+        // Fallback with default distance
+        setReservationData(prev => ({ ...prev, ...routeData, distance: 25 }));
+        setCurrentStep(2);
+      });
     setReservationData(prev => ({ ...prev, ...routeData }));
     setCurrentStep(2);
   };
 
   const handleVehicleNext = (vehicleData: any) => {
-    setReservationData(prev => ({ ...prev, ...vehicleData }));
-    setCurrentStep(3);
   };
 
   const handleCustomerNext = async (customerData: any) => {
     try {
       const finalData = { ...reservationData, ...customerData };
       
-      // Generate QR code
-      const qrCodeData = JSON.stringify({
-        reservationId: Date.now().toString(),
-        timestamp: Date.now(),
-      });
+      // Create user account automatically
+      const userProfile = await AuthService.createUserProfile({
+        email: customerData.email,
+        displayName: `${customerData.firstName} ${customerData.lastName}`,
+        uid: Date.now().toString()
+      } as any);
       
-      const qrCodeUrl = await QRCode.toDataURL(qrCodeData);
+      // Generate QR code with reservation data
+      const reservationId = `RES${Date.now()}`;
+      const reservationWithId = { ...finalData, id: reservationId };
+      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
+      
+      // Send confirmation email
+      await EmailService.sendConfirmationEmail(reservationWithId, qrCodeUrl);
+      
       setQrCode(qrCodeUrl);
-      setReservationData(finalData);
+      setReservationData(reservationWithId);
       
       setCurrentStep(4);
       
@@ -359,31 +386,19 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="block text-lg font-semibold text-white">Nereden</label>
-            <div className="relative">
-              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input
-                type="text"
-                value={formData.from}
-                onChange={(e) => setFormData({...formData, from: e.target.value})}
-                placeholder="Başlangıç adresi"
-                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                required
-              />
-            </div>
+            <AddressAutocomplete
+              value={formData.from}
+              onChange={(value) => setFormData({...formData, from: value})}
+              placeholder="Başlangıç adresi"
+            />
           </div>
           <div className="space-y-2">
             <label className="block text-lg font-semibold text-white">Nereye</label>
-            <div className="relative">
-              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input
-                type="text"
-                value={formData.to}
-                onChange={(e) => setFormData({...formData, to: e.target.value})}
-                placeholder="Varış adresi"
-                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
-                required
-              />
-            </div>
+            <AddressAutocomplete
+              value={formData.to}
+              onChange={(value) => setFormData({...formData, to: value})}
+              placeholder="Varış adresi"
+            />
           </div>
         </div>
 

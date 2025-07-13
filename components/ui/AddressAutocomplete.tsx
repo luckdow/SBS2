@@ -1,0 +1,113 @@
+'use client'
+
+import React, { useState, useEffect, useRef } from 'react';
+import { MapPin, Search } from 'lucide-react';
+import { GoogleMapsService } from '../../lib/services/googleMaps';
+
+interface AddressAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  className?: string;
+}
+
+export default function AddressAutocomplete({ 
+  value, 
+  onChange, 
+  placeholder, 
+  className = '' 
+}: AddressAutocompleteProps) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (value.length > 2) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(async () => {
+        setLoading(true);
+        try {
+          const results = await GoogleMapsService.getAddressSuggestions(value);
+          setSuggestions(results);
+          setShowSuggestions(true);
+        } catch (error) {
+          console.error('Address autocomplete error:', error);
+          // Fallback suggestions for demo
+          setSuggestions([
+            'Antalya Havalimanı Terminal 1',
+            'Antalya Havalimanı Terminal 2',
+            'Lara Beach Hotel',
+            'Kemer Marina',
+            'Side Antik Tiyatro',
+            'Belek Golf Resort'
+          ].filter(addr => addr.toLowerCase().includes(value.toLowerCase())));
+          setShowSuggestions(true);
+        }
+        setLoading(false);
+      }, 300);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [value]);
+
+  const handleSuggestionClick = (suggestion: string) => {
+    onChange(suggestion);
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
+  const handleBlur = () => {
+    // Delay hiding suggestions to allow click
+    setTimeout(() => setShowSuggestions(false), 200);
+  };
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={handleBlur}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          placeholder={placeholder}
+          className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all ${className}`}
+        />
+        {loading && (
+          <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white/60"></div>
+          </div>
+        )}
+      </div>
+
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-10 w-full mt-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={index}
+              onClick={() => handleSuggestionClick(suggestion)}
+              className="w-full text-left px-4 py-3 text-white hover:bg-white/20 transition-colors border-b border-white/10 last:border-b-0 flex items-center space-x-3"
+            >
+              <MapPin className="h-4 w-4 text-white/60 flex-shrink-0" />
+              <span className="truncate">{suggestion}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
