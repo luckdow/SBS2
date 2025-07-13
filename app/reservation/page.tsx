@@ -31,6 +31,7 @@ import QRCode from 'qrcode';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
+import { reservationService } from '../../lib/services/reservationService';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
 
 export default function ReservationPage() {
@@ -141,6 +142,24 @@ export default function ReservationPage() {
     try {
       const finalData = { ...reservationData, ...customerData };
       
+      // Generate QR code with reservation data
+      const reservationId = `RES${Date.now()}`;
+      const reservationWithId = { ...finalData, id: reservationId };
+      
+      // Create reservation in Firebase
+      const firebaseReservationData = {
+        ...reservationWithId,
+        status: 'pending' as const,
+        qrCode: reservationId
+      };
+      
+      const actualReservationId = await reservationService.createReservation(firebaseReservationData);
+      
+      // Update with actual Firebase ID
+      const finalReservationData = { ...reservationWithId, id: actualReservationId };
+      
+      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
+      
       // Create user account automatically
       const userProfile = await AuthService.createUserProfile({
         email: customerData.email,
@@ -148,20 +167,15 @@ export default function ReservationPage() {
         uid: Date.now().toString()
       } as any);
       
-      // Generate QR code with reservation data
-      const reservationId = `RES${Date.now()}`;
-      const reservationWithId = { ...finalData, id: reservationId };
-      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
-      
       // Send confirmation email
-      await EmailService.sendConfirmationEmail(reservationWithId, qrCodeUrl);
+      await EmailService.sendConfirmationEmail(finalReservationData, qrCodeUrl);
       
       setQrCode(qrCodeUrl);
-      setReservationData(reservationWithId);
+      setReservationData(finalReservationData);
       
       setCurrentStep(4);
       
-      toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu!');
+      toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu ve admin paneline gönderildi!');
     } catch (error) {
       toast.error('❌ Rezervasyon oluşturulurken bir hata oluştu.');
       console.error('Reservation error:', error);
