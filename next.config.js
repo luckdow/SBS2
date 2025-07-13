@@ -4,7 +4,7 @@ const nextConfig = {
     appDir: true,
   },
   images: {
-    domains: ['maps.googleapis.com', 'via.placeholder.com'],
+    domains: ['images.pexels.com', 'via.placeholder.com'],
   },
 }
 

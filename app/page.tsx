@@ -1,8 +1,11 @@
+'use client'
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Shield, Clock, Star, ArrowRight, Phone, Mail, Users, Luggage, Plane } from 'lucide-react';
+import Link from 'next/link';
 
-function App() {
+export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -45,9 +48,9 @@ function App() {
             </motion.div>
 
             <nav className="hidden md:flex items-center space-x-8">
-              <a href="#" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">Ana Sayfa</a>
-              <a href="#" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">Hizmetler</a>
-              <a href="#" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">Hakkımızda</a>
+              <Link href="/" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">Ana Sayfa</Link>
+              <Link href="/reservation" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">Rezervasyon</Link>
+              <Link href="/admin" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">Admin</Link>
               <a href="#" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">İletişim</a>
             </nav>
 
@@ -55,9 +58,9 @@ function App() {
               <button className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
                 Giriş Yap
               </button>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              <Link href="/reservation" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                 Rezervasyon
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -90,10 +93,10 @@ function App() {
               transition={{ delay: 0.4 }}
               className="flex flex-col sm:flex-row gap-4 justify-center"
             >
-              <button className="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-blue-600 hover:bg-gray-100 focus:ring-blue-500 px-6 py-3 text-lg">
+              <Link href="/reservation" className="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-blue-600 hover:bg-gray-100 focus:ring-blue-500 px-6 py-3 text-lg">
                 Hemen Rezervasyon Yap
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </button>
+              </Link>
               <button className="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 border-2 border-white text-white hover:bg-white hover:text-blue-600 focus:ring-white px-6 py-3 text-lg">
                 <Phone className="mr-2 h-5 w-5" />
                 Bizi Arayın
@@ -157,64 +160,7 @@ function App() {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Hizmetlerimiz
-            </h2>
-            <p className="text-xl text-gray-600">
-              İhtiyacınıza uygun transfer çözümleri
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                title: 'Havalimanı Transfer',
-                description: 'Havalimanından otelinize veya otelinizden havalimanına güvenli transfer',
-                image: 'https://images.pexels.com/photos/2026324/pexels-photo-2026324.jpeg?auto=compress&cs=tinysrgb&w=500',
-                price: 'Ekonomi araçlar 8₺/km\'den başlayan fiyatlar'
-              },
-              {
-                title: 'Şehir İçi Transfer',
-                description: 'Antalya şehir merkezi ve ilçeleri arası konforlu ulaşım',
-                image: 'https://images.pexels.com/photos/1131458/pexels-photo-1131458.jpeg?auto=compress&cs=tinysrgb&w=500',
-                price: 'Saatlik kiralama seçenekleri mevcut'
-              },
-              {
-                title: 'Özel Turlar',
-                description: 'Size özel hazırlanmış tur programları ve geziler',
-                image: 'https://images.pexels.com/photos/2026324/pexels-photo-2026324.jpeg?auto=compress&cs=tinysrgb&w=500',
-                price: 'Kişiye özel fiyat hesaplama'
-              }
-            ].map((service, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2 }}
-              >
-                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-200">
-                  <img 
-                    src={service.image} 
-                    alt={service.title}
-                    className="w-full h-48 object-cover"
-                  />
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{service.title}</h3>
-                    <p className="text-gray-600 mb-4">{service.description}</p>
-                    <p className="text-sm text-blue-600 font-medium">{service.price}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Reservation Demo Section */}
+      {/* 4 Step Process */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -283,10 +229,10 @@ function App() {
           <p className="text-xl mb-8 max-w-2xl mx-auto">
             Online rezervasyon sistemi ile kolayca rezervasyon yapın, QR kod ile yolculuğunuzu başlatın
           </p>
-          <button className="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 border-2 border-white text-white hover:bg-white hover:text-blue-600 focus:ring-white px-8 py-4 text-lg">
+          <Link href="/reservation" className="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 border-2 border-white text-white hover:bg-white hover:text-blue-600 focus:ring-white px-8 py-4 text-lg">
             Rezervasyon Yap
             <ArrowRight className="ml-2 h-5 w-5" />
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -315,5 +261,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
