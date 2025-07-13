@@ -19,7 +19,7 @@ import { mockDrivers, mockVehicles, mockServices, mockReservations } from './moc
 // Check if Firebase is available
 const isFirebaseAvailable = () => {
   try {
-    return !!db;
+    return !!db && typeof window !== 'undefined';
   } catch (error) {
     console.warn('Firebase not available, using mock data');
     return false;

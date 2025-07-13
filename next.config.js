@@ -1,10 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
+  output: 'export',
+  trailingSlash: true,
   images: {
-    domains: ['images.pexels.com', 'via.placeholder.com'],
+    unoptimized: true
+  },
+  experimental: {
+    esmExternals: 'loose'
+  },
+  env: {
+    CUSTOM_KEY: 'my-value',
   },
 }
 

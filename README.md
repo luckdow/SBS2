@@ -64,15 +64,30 @@ npm run dev
 
 2. **Build Settings**:
    - Build command: `npm run build`
-   - Publish directory: `.next`
+   - Publish directory: `out`
+   - Node version: 18+
 
 3. **Deploy** butonuna tıklayın
+
+### Manual Build
+```bash
+npm run build
+```
+
+## 🌱 Firebase Seed Data
+
+Firebase'e test verileri yüklemek için:
+
+1. `/admin/seed` sayfasına gidin
+2. "Tüm Verileri Yükle" butonuna tıklayın
+3. Test verileri otomatik yüklenecek
 
 ## 📝 Notlar
 
 - Firebase konfigürasyonu environment variables ile güvenli hale getirilmiştir
 - Mock data sistemi Firebase olmadan da çalışmayı sağlar
 - Responsive tasarım tüm cihazlarda test edilmiştir
+- Static export Netlify deployment için optimize edilmiştir
 
 ## 🎨 Tasarım
 
