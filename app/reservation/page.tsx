@@ -6,6 +6,7 @@ import { Calendar, Clock, Users, Luggage, Plane, MapPin, Star, Check, CheckCircl
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
+import { reservationService } from '../../lib/services/reservationService';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -78,11 +79,20 @@ export default function ReservationPage() {
       const qrCodeUrl = await QRCode.toDataURL(qrCodeData);
       setQrCode(qrCodeUrl);
       setReservationData(finalData);
+      
+      // Save to Firebase
+      await reservationService.createReservation({
+        ...finalData,
+        qrCode: qrCodeUrl,
+        status: 'pending'
+      });
+      
       setCurrentStep(4);
       
       toast.success('Rezervasyonunuz başarıyla oluşturuldu!');
     } catch (error) {
       toast.error('Rezervasyon oluşturulurken bir hata oluştu.');
+      console.error('Reservation error:', error);
     }
   };
 

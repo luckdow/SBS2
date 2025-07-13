@@ -22,65 +22,92 @@ import {
   Search
 } from 'lucide-react';
 import Link from 'next/link';
+import { reservationService, driverService, type Reservation, type Driver } from '../../lib/services/reservationService';
+import toast from 'react-hot-toast';
+import { seedAllData } from '../../lib/seedData';
 
 export default function AdminDashboard() {
-  const [reservations, setReservations] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [stats, setStats] = useState({
-    totalReservations: 12,
-    pendingReservations: 3,
-    activeTrips: 2,
-    completedToday: 5,
-    totalRevenue: 15750,
-    todayRevenue: 2400
+    totalReservations: 0,
+    pendingReservations: 0,
+    activeTrips: 0,
+    completedToday: 0,
+    totalRevenue: 0,
+    todayRevenue: 0
   });
 
-  // Mock reservations data
-  const mockReservations = [
-    {
-      id: 'RES001',
-      from: 'Antalya Havalimanı',
-      to: 'Lara Beach Hotel',
-      date: '2024-01-15',
-      time: '14:30',
-      passengers: 2,
-      status: 'pending',
-      totalPrice: 320,
-      customerName: 'Ahmet Yılmaz',
-      phone: '+90 532 123 4567',
-      createdAt: new Date()
-    },
-    {
-      id: 'RES002',
-      from: 'Kemer Marina',
-      to: 'Antalya Havalimanı',
-      date: '2024-01-15',
-      time: '16:00',
-      passengers: 4,
-      status: 'assigned',
-      totalPrice: 450,
-      customerName: 'Fatma Demir',
-      phone: '+90 532 987 6543',
-      createdAt: new Date()
-    },
-    {
-      id: 'RES003',
-      from: 'Side Antik Tiyatro',
-      to: 'Belek Golf Resort',
-      date: '2024-01-15',
-      time: '18:15',
-      passengers: 3,
-      status: 'started',
-      totalPrice: 280,
-      customerName: 'Mehmet Özkan',
-      phone: '+90 532 456 7890',
-      createdAt: new Date()
-    }
-  ];
 
   useEffect(() => {
-    setReservations(mockReservations);
+    // Load initial data
+    seedAllData(); // Seed initial data
+    loadDrivers();
+    
+    // Set up real-time listener for reservations
+    const unsubscribe = reservationService.onReservationsChange((newReservations) => {
+      setReservations(newReservations);
+      updateStats(newReservations);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  const loadDrivers = async () => {
+    try {
+      const driversData = await driverService.getDrivers();
+      setDrivers(driversData);
+    } catch (error) {
+      console.error('Error loading drivers:', error);
+    }
+  };
+
+  const updateStats = (reservations: Reservation[]) => {
+    const today = new Date().toDateString();
+    
+    const stats = {
+      totalReservations: reservations.length,
+      pendingReservations: reservations.filter(r => r.status === 'pending').length,
+      activeTrips: reservations.filter(r => r.status === 'started').length,
+      completedToday: reservations.filter(r => 
+        r.status === 'completed' && 
+        new Date(r.createdAt.toDate()).toDateString() === today
+      ).length,
+      totalRevenue: reservations
+        .filter(r => r.status === 'completed')
+        .reduce((sum, r) => sum + r.totalPrice, 0),
+      todayRevenue: reservations
+        .filter(r => 
+          r.status === 'completed' && 
+          new Date(r.createdAt.toDate()).toDateString() === today
+        )
+        .reduce((sum, r) => sum + r.totalPrice, 0)
+    };
+    
+    setStats(stats);
+  };
+
+  const handleAssignDriver = async (driverId: string) => {
+    if (!selectedReservation) return;
+    
+    try {
+      await reservationService.updateReservationStatus(
+        selectedReservation.id!,
+        'assigned',
+        driverId
+      );
+      
+      setShowAssignModal(false);
+      setSelectedReservation(null);
+      toast.success('Şoför başarıyla atandı!');
+    } catch (error) {
+      toast.error('Şoför atanırken hata oluştu.');
+      console.error('Error assigning driver:', error);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -339,7 +366,7 @@ export default function AdminDashboard() {
                           #{reservation.id}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {new Date(reservation.createdAt).toLocaleDateString('tr-TR')}
+                          {new Date(reservation.createdAt.toDate()).toLocaleDateString('tr-TR')}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -351,7 +378,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {reservation.customerName}
+                              {reservation.firstName} {reservation.lastName}
                             </div>
                             <div className="text-sm text-gray-500">
                               {reservation.passengers} kişi
@@ -397,7 +424,13 @@ export default function AdminDashboard() {
                           <Eye className="h-4 w-4" />
                         </button>
                         {reservation.status === 'pending' && (
-                          <button className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors">
+                          <button 
+                            onClick={() => {
+                              setSelectedReservation(reservation);
+                              setShowAssignModal(true);
+                            }}
+                            className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                          >
                             <UserCheck className="h-4 w-4" />
                           </button>
                         )}
@@ -419,6 +452,43 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        {/* Driver Assignment Modal */}
+        {showAssignModal && selectedReservation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Şoför Ata - #{selectedReservation.id}
+              </h3>
+              
+              <div className="space-y-3 mb-6">
+                {drivers.filter(d => d.isActive).map((driver) => (
+                  <button
+                    key={driver.id}
+                    onClick={() => handleAssignDriver(driver.id!)}
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900">{driver.name}</div>
+                    <div className="text-sm text-gray-600">{driver.phone}</div>
+                    <div className="text-xs text-gray-500">{driver.vehicleType}</div>
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setSelectedReservation(null);
+                  }}
+                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
