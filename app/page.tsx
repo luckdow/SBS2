@@ -75,6 +75,12 @@ export default function HomePage() {
               >
                 Rezervasyon
               </Link>
+              <Link 
+                href="/login" 
+                className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-6 py-2 rounded-full hover:bg-white/20 transition-all duration-300"
+              >
+                Giriş
+              </Link>
             </div>
           </div>
         </div>
@@ -351,6 +357,22 @@ export default function HomePage() {
               <ArrowRight className="ml-3 h-6 w-6 group-hover:translate-x-1 transition-transform" />
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
             </Link>
+            
+            <div className="flex items-center space-x-4 mt-4">
+              <Link 
+                href="/login" 
+                className="text-white/80 hover:text-white font-medium transition-colors"
+              >
+                Giriş Yap
+              </Link>
+              <span className="text-white/40">•</span>
+              <Link 
+                href="/register" 
+                className="text-white/80 hover:text-white font-medium transition-colors"
+              >
+                Kayıt Ol
+              </Link>
+            </div>
           </motion.div>
         </div>
       </section>
