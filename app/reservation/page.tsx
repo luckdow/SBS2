@@ -1,12 +1,33 @@
 'use client'
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Calendar, Clock, Users, Luggage, Plane, MapPin, Star, Check, CheckCircle, Download, Mail, Phone, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Calendar, 
+  Clock, 
+  Users, 
+  Luggage, 
+  Plane, 
+  MapPin, 
+  Star, 
+  Check, 
+  CheckCircle, 
+  Download, 
+  Mail, 
+  Phone, 
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Shield,
+  Car,
+  Navigation,
+  QrCode,
+  CreditCard,
+  Gift
+} from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
-import { reservationService } from '../../lib/services/reservationService';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -23,9 +44,10 @@ export default function ReservationPage() {
       capacity: 4,
       baggage: 2,
       pricePerKm: 8,
-      image: 'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg?auto=compress&cs=tinysrgb&w=300',
-      features: ['Klima', 'Temiz Araç', 'Sigara İçilmez'],
-      rating: 4.2
+      image: 'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg?auto=compress&cs=tinysrgb&w=400',
+      features: ['Klima', 'Temiz Araç', 'Sigara İçilmez', 'Bluetooth'],
+      rating: 4.2,
+      gradient: 'from-blue-400 to-blue-600'
     },
     {
       id: '2',
@@ -33,9 +55,10 @@ export default function ReservationPage() {
       capacity: 6,
       baggage: 4,
       pricePerKm: 12,
-      image: 'https://images.pexels.com/photos/463174/pexels-photo-463174.jpeg?auto=compress&cs=tinysrgb&w=300',
-      features: ['Klima', 'Geniş İç Mekan', 'USB Şarj', 'Wi-Fi'],
-      rating: 4.7
+      image: 'https://images.pexels.com/photos/463174/pexels-photo-463174.jpeg?auto=compress&cs=tinysrgb&w=400',
+      features: ['Klima', 'Geniş İç Mekan', 'USB Şarj', 'Wi-Fi', 'Deri Koltuk'],
+      rating: 4.7,
+      gradient: 'from-purple-400 to-purple-600'
     },
     {
       id: '3',
@@ -43,17 +66,46 @@ export default function ReservationPage() {
       capacity: 8,
       baggage: 6,
       pricePerKm: 15,
-      image: 'https://images.pexels.com/photos/1335077/pexels-photo-1335077.jpeg?auto=compress&cs=tinysrgb&w=300',
-      features: ['Klima', 'Deri Koltuk', 'Mini Bar', 'Wi-Fi', 'TV'],
-      rating: 4.9
+      image: 'https://images.pexels.com/photos/1335077/pexels-photo-1335077.jpeg?auto=compress&cs=tinysrgb&w=400',
+      features: ['Klima', 'Deri Koltuk', 'Mini Bar', 'Wi-Fi', 'TV', 'Masaj'],
+      rating: 4.9,
+      gradient: 'from-yellow-400 to-orange-500'
     }
   ];
 
   const services = [
-    { id: '1', name: 'Bebek Koltuğu', price: 50, description: '0-4 yaş arası çocuklar için' },
-    { id: '2', name: 'Çocuk Koltuğu', price: 40, description: '4-12 yaş arası çocuklar için' },
-    { id: '3', name: 'Ek Bagaj', price: 30, description: 'Standart üzeri bagaj için' },
-    { id: '4', name: 'Havalimanı Karşılama', price: 75, description: 'Tabela ile karşılama hizmeti' }
+    { 
+      id: '1', 
+      name: 'Bebek Koltuğu', 
+      price: 50, 
+      description: '0-4 yaş arası çocuklar için',
+      icon: Gift,
+      gradient: 'from-pink-400 to-pink-600'
+    },
+    { 
+      id: '2', 
+      name: 'Çocuk Koltuğu', 
+      price: 40, 
+      description: '4-12 yaş arası çocuklar için',
+      icon: Users,
+      gradient: 'from-green-400 to-green-600'
+    },
+    { 
+      id: '3', 
+      name: 'Ek Bagaj', 
+      price: 30, 
+      description: 'Standart üzeri bagaj için',
+      icon: Luggage,
+      gradient: 'from-blue-400 to-blue-600'
+    },
+    { 
+      id: '4', 
+      name: 'Havalimanı Karşılama', 
+      price: 75, 
+      description: 'Tabela ile karşılama hizmeti',
+      icon: Plane,
+      gradient: 'from-purple-400 to-purple-600'
+    }
   ];
 
   const handleRouteNext = (routeData: any) => {
@@ -80,52 +132,71 @@ export default function ReservationPage() {
       setQrCode(qrCodeUrl);
       setReservationData(finalData);
       
-      // Save to Firebase
-      await reservationService.createReservation({
-        ...finalData,
-        qrCode: qrCodeUrl,
-        status: 'pending'
-      });
-      
       setCurrentStep(4);
       
-      toast.success('Rezervasyonunuz başarıyla oluşturuldu!');
+      toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu!');
     } catch (error) {
-      toast.error('Rezervasyon oluşturulurken bir hata oluştu.');
+      toast.error('❌ Rezervasyon oluşturulurken bir hata oluştu.');
       console.error('Reservation error:', error);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
+        <div className="absolute top-40 left-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-4000"></div>
+      </div>
+
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="relative z-10 backdrop-blur-md bg-white/10 border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="bg-blue-600 text-white p-2 rounded-lg">
-                <MapPin className="h-6 w-6" />
+            <Link href="/" className="flex items-center space-x-3">
+              <div className="relative">
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-xl shadow-lg">
+                  <MapPin className="h-6 w-6 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">SBS TRAVEL</h1>
-                <p className="text-xs text-gray-500">Güvenli Transfer Hizmeti</p>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                  SBS TRAVEL
+                </h1>
+                <p className="text-xs text-blue-200">Premium Transfer</p>
               </div>
             </Link>
-            <Link href="/" className="text-gray-600 hover:text-gray-900">
-              ← Ana Sayfaya Dön
+            <Link href="/" className="text-white/80 hover:text-white transition-colors flex items-center space-x-2">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Ana Sayfa</span>
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="py-12">
+      <div className="relative z-10 py-12">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Transfer Rezervasyonu</h1>
-          <p className="text-gray-600">4 kolay adımda rezervasyonunuzu tamamlayın</p>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 mb-4">
+              <Sparkles className="h-4 w-4 text-yellow-400" />
+              <span className="text-white/90 text-sm">Premium Rezervasyon</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-2">
+              <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
+                Transfer Rezervasyonu
+              </span>
+            </h1>
+            <p className="text-white/70 text-lg">4 kolay adımda lüks yolculuğunuzu planlayın</p>
+          </motion.div>
         </div>
 
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+        <div className="max-w-5xl mx-auto p-6">
+          <div className="bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8">
             {/* Step Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -136,28 +207,35 @@ export default function ReservationPage() {
                         initial={{ scale: 0.8 }}
                         animate={{ scale: currentStep >= index + 1 ? 1 : 0.8 }}
                         className={`
-                          w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm
+                          w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm relative
                           ${currentStep >= index + 1 
-                            ? 'bg-blue-600 text-white' 
-                            : 'bg-gray-200 text-gray-500'
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg' 
+                            : 'bg-white/20 text-white/60'
                           }
                         `}
                       >
-                        {index + 1}
+                        {currentStep > index + 1 ? (
+                          <CheckCircle className="h-6 w-6" />
+                        ) : (
+                          index + 1
+                        )}
+                        {currentStep >= index + 1 && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full blur opacity-75 animate-pulse"></div>
+                        )}
                       </motion.div>
-                      <span className={`mt-2 text-sm font-medium ${
-                        currentStep >= index + 1 ? 'text-blue-600' : 'text-gray-500'
+                      <span className={`mt-3 text-sm font-medium ${
+                        currentStep >= index + 1 ? 'text-white' : 'text-white/60'
                       }`}>
                         {stepNames[index]}
                       </span>
                     </div>
                     {index < 3 && (
-                      <div className="flex-1 h-0.5 mx-4 bg-gray-200">
+                      <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: '0%' }}
                           animate={{ width: currentStep > index + 1 ? '100%' : '0%' }}
-                          className="h-full bg-blue-600"
-                          transition={{ duration: 0.3 }}
+                          className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"
+                          transition={{ duration: 0.5 }}
                         />
                       </div>
                     )}
@@ -167,10 +245,12 @@ export default function ReservationPage() {
             </div>
 
             {/* Step Content */}
-            {currentStep === 1 && <RouteStep onNext={handleRouteNext} />}
-            {currentStep === 2 && <VehicleStep vehicles={vehicles} services={services} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
-            {currentStep === 3 && <CustomerInfoStep onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-            {currentStep === 4 && <ConfirmationStep reservationData={reservationData} qrCode={qrCode} />}
+            <AnimatePresence mode="wait">
+              {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
+              {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
+              {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
+              {currentStep === 4 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -198,21 +278,22 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      className="space-y-8"
     >
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Transfer Detayları</h2>
-        <p className="text-gray-600">Yolculuk bilgilerinizi girin</p>
+        <h2 className="text-3xl font-bold text-white mb-3">Transfer Detayları</h2>
+        <p className="text-white/70 text-lg">Yolculuk bilgilerinizi girin</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
         {/* Direction Selection */}
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">Transfer Yönü</label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="relative">
+        <div className="space-y-4">
+          <label className="block text-lg font-semibold text-white">Transfer Yönü</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <label className="relative group cursor-pointer">
               <input
                 type="radio"
                 name="direction"
@@ -221,19 +302,28 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
                 onChange={(e) => setFormData({...formData, direction: e.target.value})}
                 className="sr-only"
               />
-              <div className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${
                 formData.direction === 'airport-to-hotel' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-blue-500 bg-blue-500/20 backdrop-blur-md' 
+                  : 'border-white/30 bg-white/10 backdrop-blur-md hover:border-white/50'
               }`}>
-                <div className="flex items-center space-x-3">
-                  <Plane className="h-5 w-5 text-blue-600" />
-                  <span className="font-medium">Havalimanı → Otel</span>
+                <div className="flex items-center space-x-4">
+                  <div className={`p-3 rounded-xl ${
+                    formData.direction === 'airport-to-hotel' 
+                      ? 'bg-blue-500' 
+                      : 'bg-white/20'
+                  }`}>
+                    <Plane className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white text-lg">Havalimanı → Otel</span>
+                    <p className="text-white/70 text-sm">Karşılama hizmeti ile</p>
+                  </div>
                 </div>
               </div>
             </label>
 
-            <label className="relative">
+            <label className="relative group cursor-pointer">
               <input
                 type="radio"
                 name="direction"
@@ -242,14 +332,23 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
                 onChange={(e) => setFormData({...formData, direction: e.target.value})}
                 className="sr-only"
               />
-              <div className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${
                 formData.direction === 'hotel-to-airport' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-purple-500 bg-purple-500/20 backdrop-blur-md' 
+                  : 'border-white/30 bg-white/10 backdrop-blur-md hover:border-white/50'
               }`}>
-                <div className="flex items-center space-x-3">
-                  <Plane className="h-5 w-5 text-blue-600 transform rotate-180" />
-                  <span className="font-medium">Otel → Havalimanı</span>
+                <div className="flex items-center space-x-4">
+                  <div className={`p-3 rounded-xl ${
+                    formData.direction === 'hotel-to-airport' 
+                      ? 'bg-purple-500' 
+                      : 'bg-white/20'
+                  }`}>
+                    <Plane className="h-6 w-6 text-white transform rotate-180" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white text-lg">Otel → Havalimanı</span>
+                    <p className="text-white/70 text-sm">Zamanında ulaşım</p>
+                  </div>
                 </div>
               </div>
             </label>
@@ -258,98 +357,121 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 
         {/* Addresses */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Nereden</label>
-            <input
-              type="text"
-              value={formData.from}
-              onChange={(e) => setFormData({...formData, from: e.target.value})}
-              placeholder="Başlangıç adresi"
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Nereden</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="text"
+                value={formData.from}
+                onChange={(e) => setFormData({...formData, from: e.target.value})}
+                placeholder="Başlangıç adresi"
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                required
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Nereye</label>
-            <input
-              type="text"
-              value={formData.to}
-              onChange={(e) => setFormData({...formData, to: e.target.value})}
-              placeholder="Varış adresi"
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Nereye</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="text"
+                value={formData.to}
+                onChange={(e) => setFormData({...formData, to: e.target.value})}
+                placeholder="Varış adresi"
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
+                required
+              />
+            </div>
           </div>
         </div>
 
         {/* Date and Time */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Tarih</label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({...formData, date: e.target.value})}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Tarih</label>
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({...formData, date: e.target.value})}
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                required
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Saat</label>
-            <input
-              type="time"
-              value={formData.time}
-              onChange={(e) => setFormData({...formData, time: e.target.value})}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Saat</label>
+            <div className="relative">
+              <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="time"
+                value={formData.time}
+                onChange={(e) => setFormData({...formData, time: e.target.value})}
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
+                required
+              />
+            </div>
           </div>
         </div>
 
         {/* Passengers and Baggage */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Yolcu Sayısı</label>
-            <input
-              type="number"
-              min="1"
-              max="8"
-              value={formData.passengers}
-              onChange={(e) => setFormData({...formData, passengers: parseInt(e.target.value)})}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Yolcu Sayısı</label>
+            <div className="relative">
+              <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="number"
+                min="1"
+                max="8"
+                value={formData.passengers}
+                onChange={(e) => setFormData({...formData, passengers: parseInt(e.target.value)})}
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/50 transition-all"
+                required
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Bagaj Sayısı</label>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={formData.baggage}
-              onChange={(e) => setFormData({...formData, baggage: parseInt(e.target.value)})}
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Bagaj Sayısı</label>
+            <div className="relative">
+              <Luggage className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={formData.baggage}
+                onChange={(e) => setFormData({...formData, baggage: parseInt(e.target.value)})}
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/50 transition-all"
+                required
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Uçuş No (Opsiyonel)</label>
-            <input
-              type="text"
-              value={formData.flightNumber}
-              onChange={(e) => setFormData({...formData, flightNumber: e.target.value})}
-              placeholder="TK1234"
-              className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Uçuş No</label>
+            <div className="relative">
+              <Plane className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="text"
+                value={formData.flightNumber}
+                onChange={(e) => setFormData({...formData, flightNumber: e.target.value})}
+                placeholder="TK1234"
+                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/50 transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-4">
           <button
             type="submit"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
           >
-            Devam Et
+            <span>Devam Et</span>
+            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
           </button>
         </div>
       </form>
@@ -405,68 +527,81 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      className="space-y-8"
     >
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Araç & Fiyat Seçimi</h2>
-        <p className="text-gray-600">Size uygun aracı seçin (Tahmini mesafe: {distance} km)</p>
+        <h2 className="text-3xl font-bold text-white mb-3">Araç & Fiyat Seçimi</h2>
+        <p className="text-white/70 text-lg">Size uygun lüks aracı seçin (Tahmini mesafe: {distance} km)</p>
       </div>
 
       {/* Vehicle Selection */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Araç Seçimi</h3>
+      <div className="space-y-6">
+        <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
+          <Car className="h-6 w-6" />
+          <span>Premium Araç Seçimi</span>
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {vehicles.map((vehicle: any) => (
-            <div
+            <motion.div
               key={vehicle.id}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedVehicle(vehicle.id)}
-              className={`cursor-pointer transition-all border-2 rounded-xl p-6 ${
-                selectedVehicle === vehicle.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              className={`cursor-pointer transition-all duration-300 border-2 rounded-2xl p-6 backdrop-blur-md ${
+                selectedVehicle === vehicle.id 
+                  ? 'border-blue-500 bg-blue-500/20 shadow-2xl' 
+                  : 'border-white/30 bg-white/10 hover:border-white/50'
               }`}
             >
-              <img 
-                src={vehicle.image} 
-                alt={vehicle.name}
-                className="w-full h-32 object-cover rounded-lg mb-4"
-              />
-              
-              <div className="space-y-3">
-                <div>
-                  <h4 className="font-semibold text-gray-900">{vehicle.name}</h4>
-                  <div className="flex items-center space-x-1 mt-1">
+              <div className="relative mb-4 overflow-hidden rounded-xl">
+                <img 
+                  src={vehicle.image} 
+                  alt={vehicle.name}
+                  className="w-full h-40 object-cover transition-transform duration-300 hover:scale-110"
+                />
+                <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md rounded-full px-3 py-1">
+                  <div className="flex items-center space-x-1">
                     <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                    <span className="text-sm text-gray-600">{vehicle.rating}</span>
+                    <span className="text-white text-sm font-medium">{vehicle.rating}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-white text-lg">{vehicle.name}</h4>
+                  <div className="flex items-center justify-between text-sm text-white/70 mt-2">
+                    <div className="flex items-center space-x-1">
+                      <Users className="h-4 w-4" />
+                      <span>{vehicle.capacity} kişi</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Luggage className="h-4 w-4" />
+                      <span>{vehicle.baggage} bavul</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <div className="flex items-center space-x-1">
-                    <Users className="h-4 w-4" />
-                    <span>{vehicle.capacity} kişi</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Luggage className="h-4 w-4" />
-                    <span>{vehicle.baggage} bavul</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {vehicle.features.map((feature: string, index: number) => (
-                    <div key={index} className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Check className="h-3 w-3 text-green-500" />
+                    <div key={index} className="flex items-center space-x-2 text-sm text-white/80">
+                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
                       <span>{feature}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="text-center pt-2 border-t">
-                  <span className="text-2xl font-bold text-blue-600">₺{getPrice(vehicle)}</span>
-                  <p className="text-xs text-gray-500">({vehicle.pricePerKm}₺/km)</p>
+                <div className="text-center pt-4 border-t border-white/20">
+                  <div className={`bg-gradient-to-r ${vehicle.gradient} text-white px-4 py-2 rounded-xl`}>
+                    <span className="text-2xl font-bold">₺{getPrice(vehicle)}</span>
+                    <p className="text-xs opacity-90">({vehicle.pricePerKm}₺/km)</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -476,31 +611,43 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="space-y-4"
+          className="space-y-6"
         >
-          <h3 className="text-lg font-semibold text-gray-900">Ek Hizmetler</h3>
+          <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
+            <Sparkles className="h-6 w-6" />
+            <span>Ek Premium Hizmetler</span>
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {services.map((service: any) => (
-              <div
+              <motion.div
                 key={service.id}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleServiceToggle(service.id)}
-                className={`cursor-pointer transition-all border-2 rounded-xl p-4 ${
-                  selectedServices.includes(service.id) ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                className={`cursor-pointer transition-all duration-300 border-2 rounded-xl p-4 backdrop-blur-md ${
+                  selectedServices.includes(service.id) 
+                    ? 'border-green-500 bg-green-500/20' 
+                    : 'border-white/30 bg-white/10 hover:border-white/50'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{service.name}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{service.description}</p>
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg bg-gradient-to-r ${service.gradient}`}>
+                      <service.icon className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-white">{service.name}</h4>
+                      <p className="text-sm text-white/70">{service.description}</p>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <span className="font-semibold text-green-600">₺{service.price}</span>
+                    <span className="font-bold text-green-400 text-lg">₺{service.price}</span>
                     {selectedServices.includes(service.id) && (
-                      <Check className="h-5 w-5 text-green-500 ml-2 inline" />
+                      <CheckCircle className="h-5 w-5 text-green-400 ml-2 inline" />
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </motion.div>
@@ -511,44 +658,52 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6"
+          className="bg-gradient-to-r from-blue-500/20 to-purple-600/20 backdrop-blur-md border-2 border-blue-500/50 rounded-2xl p-6"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Fiyat Özeti</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
+          <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
+            <CreditCard className="h-6 w-6" />
+            <span>Fiyat Özeti</span>
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between text-white">
               <span>Araç kirası ({distance} km)</span>
-              <span>₺{getPrice(vehicles.find((v: any) => v.id === selectedVehicle))}</span>
+              <span className="font-semibold">₺{getPrice(vehicles.find((v: any) => v.id === selectedVehicle))}</span>
             </div>
             {selectedServices.map(serviceId => {
               const service = services.find((s: any) => s.id === serviceId);
               return service ? (
-                <div key={serviceId} className="flex justify-between">
+                <div key={serviceId} className="flex justify-between text-white/80">
                   <span>{service.name}</span>
-                  <span>₺{service.price}</span>
+                  <span className="font-semibold">₺{service.price}</span>
                 </div>
               ) : null;
             })}
-            <div className="border-t pt-2 flex justify-between font-bold text-lg">
-              <span>Toplam</span>
-              <span className="text-blue-600">₺{getTotalPrice()}</span>
+            <div className="border-t border-white/30 pt-3 flex justify-between font-bold text-xl">
+              <span className="text-white">Toplam</span>
+              <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                ₺{getTotalPrice()}
+              </span>
             </div>
           </div>
         </motion.div>
       )}
 
-      <div className="flex justify-between">
+      <div className="flex justify-between pt-4">
         <button
           onClick={onBack}
-          className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2"
         >
-          Geri Dön
+          <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+          <span>Geri Dön</span>
         </button>
         <button
           onClick={handleNext}
           disabled={!selectedVehicle}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group relative px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
         >
-          Devam Et
+          <span>Devam Et</span>
+          <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
         </button>
       </div>
     </motion.div>
@@ -602,102 +757,131 @@ function CustomerInfoStep({ onNext, onBack }: any) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      className="space-y-8"
     >
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">İletişim Bilgileri</h2>
-        <p className="text-gray-600">Rezervasyon için gerekli bilgilerinizi girin</p>
+        <h2 className="text-3xl font-bold text-white mb-3">İletişim Bilgileri</h2>
+        <p className="text-white/70 text-lg">Rezervasyon için gerekli bilgilerinizi girin</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Ad</label>
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Ad</label>
             <input
               type="text"
               value={formData.firstName}
               onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-              className={`block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.firstName ? 'border-red-300' : ''}`}
+              className={`w-full px-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all ${
+                errors.firstName 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
+                  : 'border-white/30 focus:border-blue-500 focus:ring-blue-500/50'
+              }`}
               required
             />
-            {errors.firstName && <p className="text-sm text-red-600">{errors.firstName}</p>}
+            {errors.firstName && <p className="text-sm text-red-400">{errors.firstName}</p>}
           </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Soyad</label>
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Soyad</label>
             <input
               type="text"
               value={formData.lastName}
               onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-              className={`block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.lastName ? 'border-red-300' : ''}`}
+              className={`w-full px-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all ${
+                errors.lastName 
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
+                  : 'border-white/30 focus:border-purple-500 focus:ring-purple-500/50'
+              }`}
               required
             />
-            {errors.lastName && <p className="text-sm text-red-600">{errors.lastName}</p>}
+            {errors.lastName && <p className="text-sm text-red-400">{errors.lastName}</p>}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">E-posta</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              className={`block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.email ? 'border-red-300' : ''}`}
-              required
-            />
-            {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">E-posta</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all ${
+                  errors.email 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
+                    : 'border-white/30 focus:border-green-500 focus:ring-green-500/50'
+                }`}
+                required
+              />
+            </div>
+            {errors.email && <p className="text-sm text-red-400">{errors.email}</p>}
           </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Telefon</label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({...formData, phone: e.target.value})}
-              placeholder="+90 532 123 4567"
-              className={`block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${errors.phone ? 'border-red-300' : ''}`}
-              required
-            />
-            {errors.phone && <p className="text-sm text-red-600">{errors.phone}</p>}
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Telefon</label>
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                placeholder="+90 532 123 4567"
+                className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all ${
+                  errors.phone 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
+                    : 'border-white/30 focus:border-yellow-500 focus:ring-yellow-500/50'
+                }`}
+                required
+              />
+            </div>
+            {errors.phone && <p className="text-sm text-red-400">{errors.phone}</p>}
           </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Uçuş Numarası (Opsiyonel)</label>
-          <input
-            type="text"
-            value={formData.flightNumber}
-            onChange={(e) => setFormData({...formData, flightNumber: e.target.value})}
-            placeholder="TK1234"
-            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
+        <div className="space-y-2">
+          <label className="block text-lg font-semibold text-white">Uçuş Numarası (Opsiyonel)</label>
+          <div className="relative">
+            <Plane className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+            <input
+              type="text"
+              value={formData.flightNumber}
+              onChange={(e) => setFormData({...formData, flightNumber: e.target.value})}
+              placeholder="TK1234"
+              className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/50 transition-all"
+            />
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Özel İstekler (Opsiyonel)</label>
+        <div className="space-y-2">
+          <label className="block text-lg font-semibold text-white">Özel İstekler (Opsiyonel)</label>
           <textarea
             value={formData.specialRequests}
             onChange={(e) => setFormData({...formData, specialRequests: e.target.value})}
-            rows={3}
-            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            rows={4}
+            className="w-full px-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none"
             placeholder="Özel istekleriniz veya notlarınız..."
           />
         </div>
 
-        <div className="flex justify-between">
+        <div className="flex justify-between pt-4">
           <button
             type="button"
             onClick={onBack}
-            className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2"
           >
-            Geri Dön
+            <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+            <span>Geri Dön</span>
           </button>
           <button
             type="submit"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
           >
-            Rezervasyonu Tamamla
+            <span>Rezervasyonu Tamamla</span>
+            <CheckCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
           </button>
         </div>
       </form>
@@ -709,123 +893,187 @@ function CustomerInfoStep({ onNext, onBack }: any) {
 function ConfirmationStep({ reservationData, qrCode }: any) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="space-y-8"
     >
       {/* Success Header */}
       <div className="text-center">
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: "spring" }}
-          className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4"
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full mb-6 shadow-2xl"
         >
-          <CheckCircle className="h-8 w-8 text-green-600" />
+          <CheckCircle className="h-10 w-10 text-white" />
         </motion.div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Rezervasyonunuz Tamamlandı!</h2>
-        <p className="text-gray-600">Rezervasyon bilgileriniz e-posta adresinize gönderildi.</p>
+        <h2 className="text-4xl font-bold text-white mb-3">
+          <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+            Rezervasyonunuz Tamamlandı!
+          </span>
+        </h2>
+        <p className="text-white/70 text-lg">Rezervasyon bilgileriniz e-posta adresinize gönderildi.</p>
       </div>
 
       {/* QR Code Card */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 text-center">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Kodunuz</h3>
-        <div className="bg-white p-4 rounded-lg inline-block shadow-sm">
-          <img src={qrCode} alt="QR Code" className="w-32 h-32" />
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-gradient-to-br from-blue-500/20 to-purple-600/20 backdrop-blur-md border-2 border-blue-500/50 rounded-3xl p-8 text-center"
+      >
+        <h3 className="text-2xl font-bold text-white mb-6 flex items-center justify-center space-x-2">
+          <QrCode className="h-8 w-8" />
+          <span>QR Kodunuz</span>
+        </h3>
+        <div className="bg-white p-6 rounded-2xl inline-block shadow-2xl">
+          <img src={qrCode} alt="QR Code" className="w-40 h-40" />
         </div>
-        <p className="text-sm text-gray-600 mt-3">
+        <p className="text-white/80 mt-4 text-lg">
           Bu QR kodu şoförünüze gösterin
         </p>
-      </div>
+        <div className="mt-4 bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-3">
+          <p className="text-yellow-200 text-sm">
+            ⚡ QR kod ile anında yolculuk başlatma
+          </p>
+        </div>
+      </motion.div>
 
       {/* Reservation Details */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Rezervasyon Detayları</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6"
+      >
+        <h3 className="text-2xl font-bold text-white mb-6">Rezervasyon Detayları</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Trip Info */}
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+          <div className="space-y-6">
+            <div className="flex items-start space-x-4">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-2 rounded-lg">
+                <MapPin className="h-5 w-5 text-white" />
+              </div>
               <div>
-                <p className="font-medium text-gray-900">Güzergah</p>
-                <p className="text-sm text-gray-600">{reservationData.from} → {reservationData.to}</p>
+                <p className="font-semibold text-white text-lg">Güzergah</p>
+                <p className="text-white/80">{reservationData.from}</p>
+                <p className="text-white/60">↓</p>
+                <p className="text-white/80">{reservationData.to}</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-3">
-              <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
+            <div className="flex items-start space-x-4">
+              <div className="bg-gradient-to-r from-green-500 to-blue-600 p-2 rounded-lg">
+                <Calendar className="h-5 w-5 text-white" />
+              </div>
               <div>
-                <p className="font-medium text-gray-900">Tarih & Saat</p>
-                <p className="text-sm text-gray-600">{reservationData.date} - {reservationData.time}</p>
+                <p className="font-semibold text-white text-lg">Tarih & Saat</p>
+                <p className="text-white/80">{reservationData.date}</p>
+                <p className="text-white/80">{reservationData.time}</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-3">
-              <Users className="h-5 w-5 text-gray-400 mt-0.5" />
+            <div className="flex items-start space-x-4">
+              <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-2 rounded-lg">
+                <Users className="h-5 w-5 text-white" />
+              </div>
               <div>
-                <p className="font-medium text-gray-900">Yolcu & Bagaj</p>
-                <p className="text-sm text-gray-600">{reservationData.passengers} yolcu, {reservationData.baggage} bagaj</p>
+                <p className="font-semibold text-white text-lg">Yolcu & Bagaj</p>
+                <p className="text-white/80">{reservationData.passengers} yolcu</p>
+                <p className="text-white/80">{reservationData.baggage} bagaj</p>
               </div>
             </div>
           </div>
 
           {/* Customer Info */}
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
+          <div className="space-y-6">
+            <div className="flex items-start space-x-4">
+              <div className="bg-gradient-to-r from-yellow-500 to-orange-600 p-2 rounded-lg">
+                <Mail className="h-5 w-5 text-white" />
+              </div>
               <div>
-                <p className="font-medium text-gray-900">E-posta</p>
-                <p className="text-sm text-gray-600">{reservationData.email}</p>
+                <p className="font-semibold text-white text-lg">E-posta</p>
+                <p className="text-white/80">{reservationData.email}</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-3">
-              <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
+            <div className="flex items-start space-x-4">
+              <div className="bg-gradient-to-r from-pink-500 to-red-600 p-2 rounded-lg">
+                <Phone className="h-5 w-5 text-white" />
+              </div>
               <div>
-                <p className="font-medium text-gray-900">Telefon</p>
-                <p className="text-sm text-gray-600">{reservationData.phone}</p>
+                <p className="font-semibold text-white text-lg">Telefon</p>
+                <p className="text-white/80">{reservationData.phone}</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-3">
-              <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center mt-0.5">
-                <span className="text-xs font-bold text-green-600">₺</span>
+            <div className="flex items-start space-x-4">
+              <div className="bg-gradient-to-r from-green-500 to-teal-600 p-2 rounded-lg">
+                <CreditCard className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">Toplam Tutar</p>
-                <p className="text-sm text-gray-600">₺{reservationData.totalPrice}</p>
+                <p className="font-semibold text-white text-lg">Toplam Tutar</p>
+                <p className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                  ₺{reservationData.totalPrice}
+                </p>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <button className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center justify-center">
-          <Download className="h-4 w-4 mr-2" />
-          PDF İndir
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="flex flex-col sm:flex-row gap-4"
+      >
+        <button className="flex-1 group relative px-6 py-4 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center justify-center space-x-2">
+          <Download className="h-5 w-5 group-hover:scale-110 transition-transform" />
+          <span>PDF İndir</span>
         </button>
-        <button className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center">
-          <Mail className="h-4 w-4 mr-2" />
-          E-posta Gönder
+        <button className="flex-1 group relative px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center space-x-2">
+          <Mail className="h-5 w-5 group-hover:scale-110 transition-transform" />
+          <span>E-posta Gönder</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
         </button>
-      </div>
+      </motion.div>
 
       {/* Next Steps */}
-      <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Sonraki Adımlar</h3>
-        <div className="space-y-2 text-sm text-gray-700">
-          <p>• Şoförünüz size WhatsApp üzerinden iletişim kuracak</p>
-          <p>• Yolculuk zamanından 30 dakika önce arayacağız</p>
-          <p>• QR kodunuzu şoföre gösterdikten sonra yolculuk başlayacak</p>
-          <p>• Acil durumlar için: +90 532 123 4567</p>
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-md border-2 border-yellow-500/50 rounded-2xl p-6"
+      >
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center space-x-2">
+          <Sparkles className="h-6 w-6 text-yellow-400" />
+          <span>Sonraki Adımlar</span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-white/90">
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+            <span>Şoförünüz size WhatsApp üzerinden iletişim kuracak</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+            <span>Yolculuk zamanından 30 dakika önce arayacağız</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+            <span>QR kodunuzu şoföre gösterdikten sonra yolculuk başlayacak</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+            <span>Acil durumlar için: +90 532 123 4567</span>
+          </div>
         </div>
-      </div>
+      </motion.div>
 
       <div className="text-center">
-        <Link href="/" className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium">
-          <ArrowRight className="h-4 w-4 mr-2 transform rotate-180" />
+        <Link href="/" className="group inline-flex items-center text-white/80 hover:text-white font-medium text-lg transition-colors">
+          <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
           Ana Sayfaya Dön
         </Link>
       </div>
