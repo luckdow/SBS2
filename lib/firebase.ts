@@ -1,18 +1,23 @@
-// Firebase configuration
+// Firebase configuration with environment variables
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB6903uKvs3vjCkfreIvzensUFa25wVB9c",
-  authDomain: "sbs-travel-96d0b.firebaseapp.com",
-  projectId: "sbs-travel-96d0b",
-  storageBucket: "sbs-travel-96d0b.firebasestorage.app",
-  messagingSenderId: "689333443277",
-  appId: "1:689333443277:web:d26c455760eb28a41e6784",
-  measurementId: "G-G4FRHCJEDP"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
+
+// Validate required environment variables
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error('Firebase configuration is missing required environment variables');
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
