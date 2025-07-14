@@ -64,11 +64,15 @@ export default function AdminVehiclesPage() {
   const loadVehicles = async () => {
     try {
       setLoading(true);
+      console.log('🚗 Loading vehicles...');
       const vehiclesData = await vehicleService.getAll();
+      console.log('✅ Vehicles loaded:', vehiclesData);
       setVehicles(vehiclesData);
     } catch (error) {
       toast.error('Araçlar yüklenirken hata oluştu');
       console.error('Error loading vehicles:', error);
+      // Fallback to empty array if there's an error
+      setVehicles([]);
     } finally {
       setLoading(false);
     }
