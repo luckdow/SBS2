@@ -2,7 +2,7 @@
 
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Navigation, Clock, Route, AlertCircle, Loader2 } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
@@ -27,9 +27,26 @@ export default function HybridRouteDisplay({
   onRouteCalculated,
 }: HybridRouteDisplayProps) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
+
+  // Cleanup function to prevent DOM manipulation errors
+  const cleanup = useCallback(() => {
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setMap(null);
+      directionsRendererRef.current = null;
+    }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return cleanup; // Cleanup on unmount
+  }, [cleanup]);
 
   useEffect(() => {
     if (!origin || !destination) {
@@ -38,6 +55,9 @@ export default function HybridRouteDisplay({
 
     const calculateAndDisplayRoute = async () => {
       if (!mapRef.current) return;
+
+      // Clean up previous instances
+      cleanup();
 
       setStatus('loading');
       setRouteInfo(null);
@@ -52,9 +72,15 @@ export default function HybridRouteDisplay({
           streetViewControl: false,
           fullscreenControl: false,
         });
+        
         const directionsRenderer = new google.maps.DirectionsRenderer({
             polylineOptions: { strokeColor: '#3B82F6', strokeWeight: 4 }
         });
+        
+        // Store references for cleanup
+        mapInstanceRef.current = map;
+        directionsRendererRef.current = directionsRenderer;
+        
         directionsRenderer.setMap(map);
 
         // Rotayı hesapla
@@ -89,7 +115,7 @@ export default function HybridRouteDisplay({
 
     calculateAndDisplayRoute();
 
-  }, [origin, destination, originPlace, destinationPlace, onRouteCalculated]);
+  }, [origin, destination, originPlace, destinationPlace, onRouteCalculated, cleanup]);
 
   if (!origin || !destination) {
     return (

@@ -43,6 +43,9 @@ export class GoogleMapsService {
   ): Promise<google.maps.places.Autocomplete> {
     const google = await this.loadGoogleMaps();
     
+    // TODO: Migrate to PlaceAutocompleteElement for new projects after March 2025
+    // This API will be deprecated for new customers but continues to work for existing ones
+    
     const defaultOptions: google.maps.places.AutocompleteOptions = {
       componentRestrictions: { country: ['tr'] },
       fields: ['place_id', 'geometry', 'name', 'formatted_address', 'types'],
@@ -50,7 +53,12 @@ export class GoogleMapsService {
       ...options
     };
 
-    return new google.maps.places.Autocomplete(input, defaultOptions);
+    try {
+      return new google.maps.places.Autocomplete(input, defaultOptions);
+    } catch (error) {
+      console.warn('Google Maps Autocomplete creation failed:', error);
+      throw new Error('Otomatik tamamlama özelliği başlatılamadı');
+    }
   }
 
   static async createMap(
@@ -85,6 +93,20 @@ export class GoogleMapsService {
   ): Promise<google.maps.DirectionsResult> {
     const google = await this.loadGoogleMaps();
     
+    // Validate input parameters
+    if (!origin || !destination) {
+      throw new Error('Başlangıç ve varış noktaları gereklidir');
+    }
+
+    // Check for obviously invalid destinations
+    if (typeof destination === 'string' && destination.trim().length < 2) {
+      throw new Error('Geçersiz varış noktası. Lütfen tam adres veya konum adı girin');
+    }
+
+    if (typeof origin === 'string' && origin.trim().length < 2) {
+      throw new Error('Geçersiz başlangıç noktası. Lütfen tam adres veya konum adı girin');
+    }
+    
     const directionsService = new google.maps.DirectionsService();
     
     return new Promise((resolve, reject) => {
@@ -100,7 +122,34 @@ export class GoogleMapsService {
           if (status === google.maps.DirectionsStatus.OK && result) {
             resolve(result);
           } else {
-            reject(new Error(`Directions request failed: ${status}`));
+            // Provide user-friendly error messages
+            let errorMessage = 'Rota hesaplanamadı';
+            switch (status) {
+              case google.maps.DirectionsStatus.NOT_FOUND:
+                errorMessage = 'Girilen konum bulunamadı. Lütfen geçerli bir adres veya konum adı girin';
+                break;
+              case google.maps.DirectionsStatus.ZERO_RESULTS:
+                errorMessage = 'Bu iki nokta arasında rota bulunamadı';
+                break;
+              case google.maps.DirectionsStatus.MAX_WAYPOINTS_EXCEEDED:
+                errorMessage = 'Çok fazla ara nokta belirtildi';
+                break;
+              case google.maps.DirectionsStatus.INVALID_REQUEST:
+                errorMessage = 'Geçersiz rota isteği. Lütfen konum bilgilerini kontrol edin';
+                break;
+              case google.maps.DirectionsStatus.OVER_QUERY_LIMIT:
+                errorMessage = 'Harita servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin';
+                break;
+              case google.maps.DirectionsStatus.REQUEST_DENIED:
+                errorMessage = 'Harita servisi erişimi reddedildi';
+                break;
+              case google.maps.DirectionsStatus.UNKNOWN_ERROR:
+                errorMessage = 'Bilinmeyen harita hatası. Lütfen tekrar deneyin';
+                break;
+              default:
+                errorMessage = `Rota servisi hatası: ${status}`;
+            }
+            reject(new Error(errorMessage));
           }
         }
       );
