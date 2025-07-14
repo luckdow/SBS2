@@ -26,6 +26,7 @@ export default function AddressAutocomplete({
   const [loading, setLoading] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [apiError, setApiError] = useState<string>('');
+  const [suggestionsSource, setSuggestionsSource] = useState<'api' | 'fallback'>('fallback');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
@@ -37,11 +38,12 @@ export default function AddressAutocomplete({
         await loadGoogleMapsAPI();
         setGoogleMapsLoaded(true);
         setApiError('');
-        console.log('🗺️ Google Maps API loaded for autocomplete');
+        console.log('🗺️ Google Maps API loaded successfully for autocomplete');
       } catch (error) {
-        console.warn('🗺️ Google Maps API failed to load, fallback suggestions will be used:', error);
+        console.log('🗺️ Google Maps API failed to load, enhanced fallback suggestions will be used:', error);
         setGoogleMapsLoaded(false);
         setApiError(error instanceof Error ? error.message : 'Google Maps API failed to load');
+        // Don't show error immediately, let user try to use the fallback first
       }
     };
 
@@ -61,38 +63,51 @@ export default function AddressAutocomplete({
           const results = await GoogleMapsService.getAddressSuggestions(value, true);
           if (results.status === 'success') {
             setSuggestions(results.suggestions);
+            setSuggestionsSource(results.source || 'fallback');
             if (results.popularDestinations) {
               setPopularDestinations(results.popularDestinations);
             }
             setShowSuggestions(true);
+            // Clear any previous errors if suggestions are working
+            if (results.suggestions.length > 0) {
+              setApiError('');
+            }
           } else {
             console.error('Address autocomplete error:', results.error);
-            // Use fallback with popular destinations
+            // Use enhanced fallback with better Turkish locations
             const fallbackSuggestions = [
               'Antalya Havalimanı Terminal 1',
               'Antalya Havalimanı Terminal 2', 
               'Lara Beach Hotel, Antalya',
               'Lara Beach, Antalya',
               'Kemer Marina, Antalya',
-              'Side Antik Tiyatro, Antalya',
-              'Belek Golf Resort, Antalya'
+              'Side Antik Tiyatro, Manavgat',
+              'Belek Golf Resort, Serik',
+              'Kaleiçi, Antalya',
+              'Düden Şelalesi, Antalya'
             ].filter(addr => addr.toLowerCase().includes(value.toLowerCase()));
             setSuggestions(fallbackSuggestions);
+            setSuggestionsSource('fallback');
             setShowSuggestions(true);
           }
         } catch (error) {
           console.error('Address autocomplete error:', error);
-          // Enhanced fallback suggestions
+          // Enhanced fallback suggestions with better filtering
           const fallbackSuggestions = [
             'Antalya Havalimanı Terminal 1',
             'Antalya Havalimanı Terminal 2',
             'Lara Beach Hotel, Antalya',
             'Lara Beach, Antalya', 
             'Kemer Marina, Antalya',
-            'Side Antik Tiyatro, Antalya',
-            'Belek Golf Resort, Antalya'
+            'Side Antik Tiyatro, Manavgat',
+            'Belek Golf Resort, Serik',
+            'Kaleiçi, Antalya',
+            'Düden Şelalesi, Antalya',
+            'Konyaaltı Beach, Antalya',
+            'Aspendos Antik Tiyatrosu, Serik'
           ].filter(addr => addr.toLowerCase().includes(value.toLowerCase()));
           setSuggestions(fallbackSuggestions);
+          setSuggestionsSource('fallback');
           setShowSuggestions(true);
         }
         setLoading(false);
@@ -198,24 +213,31 @@ export default function AddressAutocomplete({
             </>
           )}
           
-          {/* API Status Indicator */}
-          {!googleMapsLoaded && (
-            <div className="px-4 py-2 border-t border-white/10">
-              <div className="flex items-center space-x-2 text-xs text-white/60">
-                <AlertCircle className="h-3 w-3" />
-                <span>Google Maps API yükleniyor - {suggestions.length > 0 ? 'Gerçek zamanlı' : 'Statik'} öneriler gösteriliyor</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDiagnostics(true);
-                  }}
-                  className="text-blue-300 hover:text-blue-200 underline"
-                >
-                  Detay
-                </button>
-              </div>
+          {/* Enhanced API Status Indicator */}
+          <div className="px-4 py-2 border-t border-white/10">
+            <div className="flex items-center space-x-2 text-xs text-white/60">
+              {googleMapsLoaded ? (
+                <>
+                  <div className="h-2 w-2 rounded-full bg-green-400"></div>
+                  <span>Google Maps API aktif - {suggestionsSource === 'api' ? 'Canlı' : 'Gelişmiş yerel'} öneriler</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-3 w-3 text-yellow-400" />
+                  <span>Google Maps API {apiError ? 'hatası' : 'yükleniyor'} - Gelişmiş yerel öneriler gösteriliyor</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDiagnostics(true);
+                    }}
+                    className="text-blue-300 hover:text-blue-200 underline"
+                  >
+                    Detay
+                  </button>
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
       ) : null}
 

@@ -1,14 +1,18 @@
 // Google Maps API Integration - Singleton Service
 export class GoogleMapsService {
   private static instance: GoogleMapsService | null = null;
-  // API key is now read from environment variables for consistency
+  
+  // API key is now read from environment variables with proper fallback
   private static get apiKey(): string {
     if (typeof window !== 'undefined') {
-      // In browser environment, Next.js injects the env var
-      return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+      // Browser environment - check both window and process
+      return window.process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 
+             process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
     }
+    // Server environment
     return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
   }
+  
   private static cache = new Map();
   private static cacheTimeout = 5 * 60 * 1000; // 5 minutes
   private static isInitialized = false;
@@ -25,7 +29,8 @@ export class GoogleMapsService {
 
   // Check if API key is configured
   static isConfigured(): boolean {
-    return !!this.apiKey && this.apiKey !== 'your_google_maps_api_key_here';
+    const key = this.apiKey;
+    return !!(key && key !== 'your_google_maps_api_key_here' && key !== 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw');
   }
 
   // Check if Google Maps JavaScript API is loaded and ready
@@ -224,12 +229,14 @@ export class GoogleMapsService {
     popularDestinations?: string[];
     status: 'success' | 'error';
     error?: string;
+    source?: 'api' | 'fallback';
   }> {
     if (!input || input.length < 2) {
       return {
         suggestions: [],
         popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
-        status: 'success'
+        status: 'success',
+        source: 'fallback'
       };
     }
 
@@ -237,6 +244,7 @@ export class GoogleMapsService {
     const cacheKey = `autocomplete-${input}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      console.log('🗺️ Using cached autocomplete result for:', input);
       return {
         ...cached.data,
         popularDestinations: includePopular ? this.getPopularDestinations() : undefined
@@ -245,11 +253,12 @@ export class GoogleMapsService {
 
     try {
       if (!this.isConfigured()) {
-        console.warn('🗺️ Google Maps API key not configured, using fallback suggestions');
+        console.log('🗺️ Google Maps API key not configured, using enhanced fallback suggestions');
+        const fallback = this.getFallbackSuggestions(input);
         return {
-          suggestions: this.getFallbackSuggestions(input).suggestions,
+          ...fallback,
           popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
-          status: 'success'
+          source: 'fallback'
         };
       }
 
@@ -263,7 +272,7 @@ export class GoogleMapsService {
             componentRestrictions: { country: 'tr' },
             language: 'tr',
             types: ['establishment', 'geocode'],
-            // Focus on Antalya region
+            // Focus on Antalya region for better Turkish results
             locationBias: {
               center: { lat: 36.8969, lng: 30.7133 },
               radius: 100000 // 100km radius around Antalya
@@ -272,7 +281,8 @@ export class GoogleMapsService {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
               const result = {
                 suggestions: predictions.map((prediction: any) => prediction.description),
-                status: 'success' as const
+                status: 'success' as const,
+                source: 'api' as const
               };
               
               // Cache the result
@@ -287,28 +297,35 @@ export class GoogleMapsService {
                 popularDestinations: includePopular ? this.getPopularDestinations() : undefined
               });
             } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-              const result = { suggestions: [], status: 'success' as const };
+              const result = { 
+                suggestions: [], 
+                status: 'success' as const, 
+                source: 'api' as const 
+              };
               this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+              console.log('🗺️ No suggestions found via Places API, zero results');
               resolve({
                 ...result,
                 popularDestinations: includePopular ? this.getPopularDestinations() : undefined
               });
             } else {
-              console.warn('🗺️ Places AutocompleteService error:', status);
+              console.warn('🗺️ Places AutocompleteService error status:', status, 'falling back to enhanced local suggestions');
               const fallback = this.getFallbackSuggestions(input);
               resolve({
                 ...fallback,
-                popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+                popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
+                source: 'fallback'
               });
             }
           });
         });
       } else {
-        console.warn('🗺️ Google Maps Places AutocompleteService not available, using fallback');
+        console.log('🗺️ Google Maps Places AutocompleteService not available, using enhanced fallback');
         const fallback = this.getFallbackSuggestions(input);
         return {
           ...fallback,
-          popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+          popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
+          source: 'fallback'
         };
       }
     } catch (error) {
@@ -316,7 +333,9 @@ export class GoogleMapsService {
       const fallback = this.getFallbackSuggestions(input);
       return {
         ...fallback,
-        popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+        popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
+        source: 'fallback',
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
