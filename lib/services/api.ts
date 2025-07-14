@@ -16,15 +16,14 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase';
 import { Reservation, Driver, Vehicle, Service, Customer, Transaction } from '../types';
-import { mockDrivers, mockVehicles, mockServices, mockReservations } from './mockData';
 import { reservationService as firebaseReservationService } from './reservationService';
 
 // Check if Firebase is available and properly configured
 const isFirebaseAvailable = () => {
   try {
-
+    return isFirebaseConfigured();
   } catch (error) {
-    console.warn('Firebase not available, using mock data');
+    console.warn('Firebase not available');
     return false;
   }
 };
@@ -61,21 +60,13 @@ class CacheManager {
   }
 }
 
-// Generic CRUD Service with fallback to mock data
+// Generic CRUD Service without fallback to mock data
 class CRUDService<T> {
-  constructor(private collectionName: string, private mockData: T[] = []) {}
+  constructor(private collectionName: string) {}
 
   async create(data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     if (!isFirebaseAvailable()) {
-      const newId = Date.now().toString();
-      const newItem = {
-        ...data,
-        id: newId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } as T;
-      this.mockData.push(newItem);
-      return newId;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -91,7 +82,7 @@ class CRUDService<T> {
       return docRef.id;
     } catch (error) {
       console.error(`❌ Error creating ${this.collectionName}:`, error);
-      throw error;
+      throw new Error(`Failed to create ${this.collectionName}. Please try again.`);
     }
   }
 
@@ -106,8 +97,7 @@ class CRUDService<T> {
     }
 
     if (!isFirebaseAvailable()) {
-      console.log(`🔄 Firebase not available, using mock data for ${this.collectionName}`);
-      return [...this.mockData];
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -132,15 +122,13 @@ class CRUDService<T> {
         return fallbackCached;
       }
       
-      // Final fallback to mock data
-      console.log(`🔄 Using mock data for ${this.collectionName} due to error`);
-      return [...this.mockData];
+      throw new Error(`Failed to load ${this.collectionName}. Please try again.`);
     }
   }
 
   async getById(id: string): Promise<T | null> {
     if (!isFirebaseAvailable()) {
-      return this.mockData.find((item: any) => item.id === id) || null;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -156,17 +144,13 @@ class CRUDService<T> {
       return null;
     } catch (error) {
       console.error(`Error getting ${this.collectionName} by id:`, error);
-      return this.mockData.find((item: any) => item.id === id) || null;
+      throw new Error(`Failed to get ${this.collectionName}. Please try again.`);
     }
   }
 
   async update(id: string, data: Partial<T>): Promise<void> {
     if (!isFirebaseAvailable()) {
-      const index = this.mockData.findIndex((item: any) => item.id === id);
-      if (index !== -1) {
-        this.mockData[index] = { ...this.mockData[index], ...data, updatedAt: new Date() };
-      }
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -181,17 +165,13 @@ class CRUDService<T> {
       console.log(`✅ Updated ${this.collectionName} item ${id}`);
     } catch (error) {
       console.error(`❌ Error updating ${this.collectionName}:`, error);
-      throw error;
+      throw new Error(`Failed to update ${this.collectionName}. Please try again.`);
     }
   }
 
   async delete(id: string): Promise<void> {
     if (!isFirebaseAvailable()) {
-      const index = this.mockData.findIndex((item: any) => item.id === id);
-      if (index !== -1) {
-        this.mockData.splice(index, 1);
-      }
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -203,15 +183,13 @@ class CRUDService<T> {
       console.log(`✅ Deleted ${this.collectionName} item ${id}`);
     } catch (error) {
       console.error(`❌ Error deleting ${this.collectionName}:`, error);
-      throw error;
+      throw new Error(`Failed to delete ${this.collectionName}. Please try again.`);
     }
   }
 
   onSnapshot(callback: (items: T[]) => void) {
     if (!isFirebaseAvailable()) {
-      // For mock data, just call the callback immediately
-      callback([...this.mockData]);
-      return () => {}; // Return empty unsubscribe function
+      throw new Error('Firebase is not configured. Real-time updates are not available.');
     }
 
     const q = query(collection(db, this.collectionName), orderBy('createdAt', 'desc'));
@@ -221,17 +199,20 @@ class CRUDService<T> {
         ...doc.data()
       } as T));
       callback(items);
+    }, (error) => {
+      console.error(`❌ Real-time listener error for ${this.collectionName}:`, error);
+      throw new Error('Real-time updates failed. Please refresh the page.');
     });
   }
 }
 
-// Specific Services with mock data fallbacks
-export const reservationService = new CRUDService<Reservation>('reservations', mockReservations as any);
-export const driverService = new CRUDService<Driver>('drivers', mockDrivers as any);
-export const vehicleService = new CRUDService<Vehicle>('vehicles', mockVehicles as any);
-export const serviceService = new CRUDService<Service>('services', mockServices as any);
-export const customerService = new CRUDService<Customer>('customers', []);
-export const transactionService = new CRUDService<Transaction>('transactions', []);
+// Specific Services without mock data fallbacks
+export const reservationService = new CRUDService<Reservation>('reservations');
+export const driverService = new CRUDService<Driver>('drivers');
+export const vehicleService = new CRUDService<Vehicle>('vehicles');
+export const serviceService = new CRUDService<Service>('services');
+export const customerService = new CRUDService<Customer>('customers');
+export const transactionService = new CRUDService<Transaction>('transactions');
 
 // Settings Service for admin panel configuration
 export interface AppSettings {
@@ -373,7 +354,7 @@ export const settingsService = {
     }
 
     if (!isFirebaseAvailable()) {
-      return { ...defaultSettings };
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -407,14 +388,13 @@ export const settingsService = {
       }
     } catch (error) {
       console.error('Error getting settings:', error);
-      return { ...defaultSettings };
+      throw new Error('Failed to load settings. Please try again.');
     }
   },
 
   async updateSettings(settings: Partial<AppSettings>): Promise<void> {
     if (!isFirebaseAvailable()) {
-      console.warn('Firebase not available, settings not persisted');
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -443,7 +423,7 @@ export const settingsService = {
       console.log('✅ Settings updated successfully');
     } catch (error) {
       console.error('❌ Error updating settings:', error);
-      throw error;
+      throw new Error('Failed to update settings. Please try again.');
     }
   },
 
@@ -560,7 +540,7 @@ export const extendedReservationService = {
 
   async getDriverReservations(driverId: string): Promise<Reservation[]> {
     if (!isFirebaseAvailable()) {
-      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -577,7 +557,7 @@ export const extendedReservationService = {
       } as Reservation));
     } catch (error) {
       console.error('Error getting driver reservations:', error);
-      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
+      throw new Error('Failed to load driver reservations. Please try again.');
     }
   }
 };
@@ -646,7 +626,7 @@ export const extendedDriverService = {
 
   async getActiveDrivers(): Promise<Driver[]> {
     if (!isFirebaseAvailable()) {
-      return mockDrivers.filter(driver => driver.isActive) as any;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -662,7 +642,7 @@ export const extendedDriverService = {
       } as Driver));
     } catch (error) {
       console.error('Error getting active drivers:', error);
-      return mockDrivers.filter(driver => driver.isActive) as any;
+      throw new Error('Failed to load active drivers. Please try again.');
     }
   }
 };
