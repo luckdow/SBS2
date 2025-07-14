@@ -22,7 +22,8 @@ import { reservationService as firebaseReservationService } from './reservationS
 // Check if Firebase is available and properly configured
 const isFirebaseAvailable = () => {
   try {
-    return !!db && typeof window !== 'undefined' && isFirebaseConfigured();
+
+main
   } catch (error) {
     console.warn('Firebase not available, using mock data');
     return false;

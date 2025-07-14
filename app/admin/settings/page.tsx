@@ -18,12 +18,18 @@ import {
   Globe,
   Key,
   Users,
-  Car
+  Car,
+  CreditCard,
+  FileText,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 export default function AdminSettingsPage() {
+  const [showPayTRKeys, setShowPayTRKeys] = useState(false);
   const [settings, setSettings] = useState({
     // Company Info
     companyName: 'SBS TRAVEL',
@@ -31,10 +37,25 @@ export default function AdminSettingsPage() {
     companyPhone: '+90 532 123 4567',
     companyAddress: 'Antalya, Türkiye',
     
+    // PayTR API Settings
+    paytrMerchantId: '',
+    paytrMerchantKey: '',
+    paytrMerchantSalt: '',
+    paytrTestMode: true,
+    paytrActive: false,
+    paytrSuccessUrl: '/payment/success',
+    paytrFailUrl: '/payment/fail',
+    
     // Pricing
     driverCommissionRate: 75,
     companyCommissionRate: 25,
     basePricePerKm: 8,
+    
+    // Email Templates
+    emailTemplateReservationConfirm: 'Rezervasyonunuz onaylandı. QR kodunuz ektedir.',
+    emailTemplateDriverAssigned: 'Şoförünüz atandı: {{driverName}} - {{driverPhone}}',
+    emailTemplateReminder: 'Rezervasyonunuz 24 saat içinde başlayacak.',
+    emailTemplateCancellation: 'Rezervasyonunuz iptal edildi.',
     
     // Notifications
     emailNotifications: true,
@@ -183,11 +204,93 @@ export default function AdminSettingsPage() {
             </div>
           </motion.div>
 
-          {/* Pricing Settings */}
+          {/* PayTR API Settings */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
+          >
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+              <CreditCard className="h-6 w-6 text-yellow-400" />
+              <span>PayTR API Ayarları</span>
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-3 h-3 rounded-full ${settings.paytrActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-white">PayTR Entegrasyonu</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.paytrActive}
+                    onChange={(e) => setSettings({...settings, paytrActive: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-white text-sm">Test Modu</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.paytrTestMode}
+                    onChange={(e) => setSettings({...settings, paytrTestMode: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Merchant ID</label>
+                <input
+                  type={showPayTRKeys ? "text" : "password"}
+                  value={settings.paytrMerchantId}
+                  onChange={(e) => setSettings({...settings, paytrMerchantId: e.target.value})}
+                  placeholder="PayTR Merchant ID"
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Merchant Key</label>
+                <input
+                  type={showPayTRKeys ? "text" : "password"}
+                  value={settings.paytrMerchantKey}
+                  onChange={(e) => setSettings({...settings, paytrMerchantKey: e.target.value})}
+                  placeholder="PayTR Merchant Key"
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Merchant Salt</label>
+                <input
+                  type={showPayTRKeys ? "text" : "password"}
+                  value={settings.paytrMerchantSalt}
+                  onChange={(e) => setSettings({...settings, paytrMerchantSalt: e.target.value})}
+                  placeholder="PayTR Merchant Salt"
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                />
+              </div>
+              
+              <button
+                onClick={() => setShowPayTRKeys(!showPayTRKeys)}
+                className="flex items-center space-x-2 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+              >
+                {showPayTRKeys ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                <span>{showPayTRKeys ? 'API anahtarlarını gizle' : 'API anahtarlarını göster'}</span>
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Pricing Settings */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
@@ -231,11 +334,63 @@ export default function AdminSettingsPage() {
             </div>
           </motion.div>
 
+          {/* Email Templates */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
+          >
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+              <FileText className="h-6 w-6 text-orange-400" />
+              <span>Email Şablonları</span>
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Rezervasyon Onay</label>
+                <textarea
+                  value={settings.emailTemplateReservationConfirm}
+                  onChange={(e) => setSettings({...settings, emailTemplateReservationConfirm: e.target.value})}
+                  rows={3}
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Şoför Atama</label>
+                <textarea
+                  value={settings.emailTemplateDriverAssigned}
+                  onChange={(e) => setSettings({...settings, emailTemplateDriverAssigned: e.target.value})}
+                  rows={3}
+                  placeholder="{{driverName}} ve {{driverPhone}} değişkenlerini kullanabilirsiniz"
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Hatırlatma</label>
+                <textarea
+                  value={settings.emailTemplateReminder}
+                  onChange={(e) => setSettings({...settings, emailTemplateReminder: e.target.value})}
+                  rows={2}
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">İptal Bildirimi</label>
+                <textarea
+                  value={settings.emailTemplateCancellation}
+                  onChange={(e) => setSettings({...settings, emailTemplateCancellation: e.target.value})}
+                  rows={2}
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all resize-none"
+                />
+              </div>
+            </div>
+          </motion.div>
+
           {/* Notification Settings */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.4 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
@@ -295,7 +450,7 @@ export default function AdminSettingsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.5 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
@@ -351,7 +506,7 @@ export default function AdminSettingsPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.6 }}
           className="mt-8 text-center"
         >
           <button 
