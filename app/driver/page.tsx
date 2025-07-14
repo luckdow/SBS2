@@ -30,7 +30,7 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import QRScanner from '../../components/ui/QRScanner';
-import { reservationService } from '../../lib/services/reservationService';
+import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { NotificationService } from '../../lib/services/notificationService';
 
 export default function DriverPanel() {
@@ -102,12 +102,13 @@ export default function DriverPanel() {
     loadDriverReservations();
     
     // Real-time listener for driver reservations
-    const unsubscribe = reservationService.onReservationsChange((allReservations) => {
+    const unsubscribe = realTimeReservationService.onReservationsChange((allReservations) => {
       const driverReservations = allReservations.filter(res => 
-        res.assignedDriver === driverId && 
+        res.driverId === driverId && 
         ['assigned', 'started'].includes(res.status)
       );
       setReservations(driverReservations);
+      console.log('🚗 Driver panel received real-time update:', driverReservations.length, 'reservations for driver:', driverId);
     });
     
     return () => unsubscribe();
@@ -116,8 +117,10 @@ export default function DriverPanel() {
   const loadDriverReservations = async () => {
     try {
       setLoading(true);
-      const driverReservations = await reservationService.getDriverReservations(driverId);
+      console.log('🚗 Loading driver reservations for:', driverId);
+      const driverReservations = await realTimeReservationService.getDriverReservations(driverId);
       setReservations(driverReservations);
+      console.log('✅ Driver reservations loaded:', driverReservations.length);
     } catch (error) {
       console.error('Error loading driver reservations:', error);
       // Fallback to mock data
@@ -129,7 +132,8 @@ export default function DriverPanel() {
 
   const handleStartTrip = async (reservationId: string) => {
     try {
-      await reservationService.updateReservationStatus(reservationId, 'started');
+      console.log('🚀 Starting trip:', reservationId);
+      await realTimeReservationService.updateStatus(reservationId, 'started');
       toast.success('🚗 Yolculuk başlatıldı!');
     } catch (error) {
       toast.error('❌ Yolculuk başlatılırken hata oluştu.');
@@ -139,7 +143,8 @@ export default function DriverPanel() {
 
   const handleCompleteTrip = async (reservationId: string) => {
     try {
-      await reservationService.updateReservationStatus(reservationId, 'completed');
+      console.log('✅ Completing trip:', reservationId);
+      await realTimeReservationService.updateStatus(reservationId, 'completed');
       setDriverStats(prev => ({ ...prev, todayTrips: prev.todayTrips + 1 }));
       
       // Send completion notification
@@ -160,11 +165,13 @@ export default function DriverPanel() {
       const qrData = JSON.parse(data);
       const reservationId = qrData.reservationId;
       
+      console.log('📱 QR Code scanned:', qrData);
+      
       // Find and start the trip
       const reservation = reservations.find(res => res.id === reservationId);
       if (reservation) {
         handleStartTrip(reservationId);
-        toast.success('🎉 QR kod başarıyla okundu! Yolculuk başlatıldı.');
+        toast.success(`🎉 QR kod başarıyla okundu! ${reservation.firstName} ${reservation.lastName} için yolculuk başlatıldı.`);
       } else {
         toast.error('❌ Geçersiz QR kod!');
       }

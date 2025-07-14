@@ -31,7 +31,7 @@ import QRCode from 'qrcode';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
-import { reservationService } from '../../lib/services/reservationService';
+import { realTimeReservationService } from '../../lib/services/realTimeService';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
 
 export default function ReservationPage() {
@@ -146,14 +146,22 @@ export default function ReservationPage() {
       const reservationId = `RES${Date.now()}`;
       const reservationWithId = { ...finalData, id: reservationId };
       
-      // Create reservation in Firebase
-      const firebaseReservationData = {
+      // Create reservation with real-time service
+      const reservationForFirebase = {
         ...reservationWithId,
         status: 'pending' as const,
-        qrCode: reservationId
+        qrCode: reservationId,
+        customerId: `customer_${Date.now()}`,
+        firstName: customerData.firstName,
+        lastName: customerData.lastName,
+        email: customerData.email,
+        phone: customerData.phone,
+        flightNumber: customerData.flightNumber || '',
+        specialRequests: customerData.specialRequests || ''
       };
       
-      const actualReservationId = await reservationService.createReservation(firebaseReservationData);
+      console.log('🚀 Creating reservation:', reservationForFirebase);
+      const actualReservationId = await realTimeReservationService.create(reservationForFirebase);
       
       // Update with actual Firebase ID
       const finalReservationData = { ...reservationWithId, id: actualReservationId };
