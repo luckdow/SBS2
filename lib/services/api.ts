@@ -23,7 +23,6 @@ import { reservationService as firebaseReservationService } from './reservationS
 const isFirebaseAvailable = () => {
   try {
 
-main
   } catch (error) {
     console.warn('Firebase not available, using mock data');
     return false;
