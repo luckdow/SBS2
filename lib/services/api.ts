@@ -12,7 +12,7 @@ import {
   Timestamp,
   getDoc 
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, isFirebaseConfigured } from '../firebase';
 import { Reservation, Driver, Vehicle, Service, Customer, Transaction } from '../types';
 import { mockDrivers, mockVehicles, mockServices, mockReservations } from './mockData';
 import { reservationService as firebaseReservationService } from './reservationService';
@@ -20,12 +20,7 @@ import { reservationService as firebaseReservationService } from './reservationS
 // Check if Firebase is available
 const isFirebaseAvailable = () => {
   try {
-    // Force mock data for development/testing when no internet
-    if (typeof window !== 'undefined') {
-      console.log('🔄 Using mock data for development');
-      return false;
-    }
-    return !!db;
+    return !!db && typeof window !== 'undefined' && isFirebaseConfigured();
   } catch (error) {
     console.warn('Firebase not available, using mock data');
     return false;
