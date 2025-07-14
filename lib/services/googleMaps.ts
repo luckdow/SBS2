@@ -31,35 +31,44 @@ export class GoogleMapsService {
         return this.getFallbackDistance(origin, destination);
       }
 
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&key=${this.apiKey}&units=metric&language=tr`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
-        const element = data.rows[0].elements[0];
-        const result = {
-          distance: Math.round(element.distance.value / 1000), // Convert to KM
-          duration: element.duration.text,
-          route: data,
-          status: 'success' as const
-        };
-        
-        // Cache the result
-        this.cache.set(cacheKey, {
-          data: result,
-          timestamp: Date.now()
+      // Check if Google Maps JavaScript API is loaded
+      if (typeof window !== 'undefined' && window.google && window.google.maps) {
+        return new Promise((resolve) => {
+          const service = new window.google.maps.DistanceMatrixService();
+          
+          service.getDistanceMatrix({
+            origins: [origin],
+            destinations: [destination],
+            travelMode: window.google.maps.TravelMode.DRIVING,
+            unitSystem: window.google.maps.UnitSystem.METRIC,
+            language: 'tr',
+            region: 'TR'
+          }, (response: any, status: any) => {
+            if (status === window.google.maps.DistanceMatrixStatus.OK && response.rows[0].elements[0].status === 'OK') {
+              const element = response.rows[0].elements[0];
+              const result = {
+                distance: Math.round(element.distance.value / 1000), // Convert to KM
+                duration: element.duration.text,
+                route: response,
+                status: 'success' as const
+              };
+              
+              // Cache the result
+              this.cache.set(cacheKey, {
+                data: result,
+                timestamp: Date.now()
+              });
+              
+              console.log('📍 Distance calculated:', result.distance, 'km');
+              resolve(result);
+            } else {
+              console.warn('🗺️ Google Maps DistanceMatrix API error:', status);
+              resolve(this.getFallbackDistance(origin, destination));
+            }
+          });
         });
-        
-        console.log('📍 Distance calculated:', result.distance, 'km');
-        return result;
       } else {
-        console.warn('🗺️ Google Maps API returned error:', data.status, data.error_message);
+        console.warn('🗺️ Google Maps JavaScript API not loaded, using fallback');
         return this.getFallbackDistance(origin, destination);
       }
     } catch (error) {
@@ -91,31 +100,37 @@ export class GoogleMapsService {
         return this.getFallbackSuggestions(input);
       }
 
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${this.apiKey}&language=tr&components=country:tr`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.status === 'OK') {
-        const result = {
-          suggestions: data.predictions.map((prediction: any) => prediction.description),
-          status: 'success' as const
-        };
-        
-        // Cache the result
-        this.cache.set(cacheKey, {
-          data: result,
-          timestamp: Date.now()
+      // Check if Google Maps JavaScript API is loaded
+      if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places) {
+        return new Promise((resolve) => {
+          const service = new window.google.maps.places.AutocompleteService();
+          
+          service.getPlacePredictions({
+            input: input,
+            componentRestrictions: { country: 'tr' },
+            language: 'tr'
+          }, (predictions: any, status: any) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+              const result = {
+                suggestions: predictions.map((prediction: any) => prediction.description),
+                status: 'success' as const
+              };
+              
+              // Cache the result
+              this.cache.set(cacheKey, {
+                data: result,
+                timestamp: Date.now()
+              });
+              
+              resolve(result);
+            } else {
+              console.warn('🗺️ Google Places AutocompleteService error:', status);
+              resolve(this.getFallbackSuggestions(input));
+            }
+          });
         });
-        
-        return result;
       } else {
-        console.warn('🗺️ Google Places API returned error:', data.status);
+        console.warn('🗺️ Google Maps JavaScript API not loaded, using fallback suggestions');
         return this.getFallbackSuggestions(input);
       }
     } catch (error) {

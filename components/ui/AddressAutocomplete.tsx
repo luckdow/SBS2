@@ -4,6 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Search } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
 
+// Declare Google Maps types for TypeScript
+declare global {
+  interface Window {
+    google: any;
+    initGoogleMapsForAutocomplete: () => void;
+  }
+}
+
 interface AddressAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
@@ -20,8 +28,57 @@ export default function AddressAutocomplete({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
+
+  // Load Google Maps JavaScript API
+  useEffect(() => {
+    const loadGoogleMaps = () => {
+      if (window.google) {
+        setGoogleMapsLoaded(true);
+        return;
+      }
+
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
+        console.warn('Google Maps API key not configured for autocomplete');
+        return;
+      }
+
+      // Check if script is already loading
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        // Script already exists, wait for it to load
+        const checkLoaded = () => {
+          if (window.google) {
+            setGoogleMapsLoaded(true);
+          } else {
+            setTimeout(checkLoaded, 100);
+          }
+        };
+        checkLoaded();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMapsForAutocomplete`;
+      script.async = true;
+      script.defer = true;
+
+      window.initGoogleMapsForAutocomplete = () => {
+        setGoogleMapsLoaded(true);
+      };
+
+      script.onerror = () => {
+        console.error('Google Maps API failed to load for autocomplete');
+      };
+
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+  }, []);
 
   useEffect(() => {
     if (value.length > 2) {

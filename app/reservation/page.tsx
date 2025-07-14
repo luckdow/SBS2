@@ -811,8 +811,8 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
 
                 <div className="text-center pt-4 border-t border-white/20">
                   <div className={`bg-gradient-to-r ${vehicle.gradient} text-white px-4 py-2 rounded-xl`}>
-                    <span className="text-2xl font-bold">₺{getPrice(vehicle)}</span>
-                    <p className="text-xs opacity-90">({vehicle.pricePerKm}₺/km)</p>
+                    <span className="text-lg font-bold">Premium Paket</span>
+                    <p className="text-xs opacity-90">Konfor & Güvenlik</p>
                   </div>
                 </div>
               </div>
