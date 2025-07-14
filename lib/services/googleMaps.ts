@@ -1,7 +1,9 @@
 // Google Maps API Integration - Singleton Service
 export class GoogleMapsService {
   private static instance: GoogleMapsService | null = null;
-  private static apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // --- DEĞİŞİKLİK BURADA YAPILDI ---
+  // API Anahtarı artık ortam değişkeninden okunmuyor, doğrudan koda yazıldı.
+  private static apiKey = 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw';
   private static cache = new Map();
   private static cacheTimeout = 5 * 60 * 1000; // 5 minutes
   private static isInitialized = false;
