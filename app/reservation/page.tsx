@@ -23,7 +23,8 @@ import {
   Navigation,
   QrCode,
   CreditCard,
-  Gift
+  Gift,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -35,6 +36,7 @@ import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { vehicleService, serviceService } from '../../lib/services/api';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
 import RouteVisualization from '../../components/ui/RouteVisualization';
+import PaymentStep from '../../components/ui/PaymentStep';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -45,7 +47,7 @@ export default function ReservationPage() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
 
-  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Onay'];
+  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
 
   // Load vehicles and services when component mounts
   React.useEffect(() => {
@@ -224,9 +226,18 @@ export default function ReservationPage() {
     setCurrentStep(3);
   };
 
-  const handleCustomerNext = async (customerData: any) => {
+  const handleCustomerNext = (customerData: any) => {
+    // Store customer data and move to payment step
+    setReservationData(prev => ({ 
+      ...prev, 
+      ...customerData 
+    }));
+    setCurrentStep(4); // Go to payment step
+  };
+
+  const handlePaymentNext = async (paymentData: any) => {
     try {
-      const finalData = { ...reservationData, ...customerData };
+      const finalData = { ...reservationData, ...paymentData };
       
       // Generate QR code with reservation data
       const reservationId = `RES${Date.now()}`;
@@ -238,15 +249,15 @@ export default function ReservationPage() {
         status: 'pending' as const,
         qrCode: reservationId,
         customerId: `customer_${Date.now()}`,
-        firstName: customerData.firstName,
-        lastName: customerData.lastName,
-        email: customerData.email,
-        phone: customerData.phone,
-        flightNumber: customerData.flightNumber || '',
-        specialRequests: customerData.specialRequests || ''
+        firstName: finalData.firstName,
+        lastName: finalData.lastName,
+        email: finalData.email,
+        phone: finalData.phone,
+        flightNumber: finalData.flightNumber || '',
+        specialRequests: finalData.specialRequests || ''
       };
       
-      console.log('🚀 Creating reservation:', reservationForFirebase);
+      console.log('🚀 Creating reservation with payment:', reservationForFirebase);
       const actualReservationId = await realTimeReservationService.create(reservationForFirebase);
       
       // Update with actual Firebase ID
@@ -254,37 +265,37 @@ export default function ReservationPage() {
       
       const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
       
-      // Create user account automatically
+      // **IMPORTANT CHANGE: Create user account automatically AFTER payment completion**
       try {
-        console.log('Creating customer account automatically...');
-        const fullName = `${customerData.firstName} ${customerData.lastName}`;
+        console.log('Creating customer account automatically after payment...');
+        const fullName = `${finalData.firstName} ${finalData.lastName}`;
         
         const accountResult = await AuthService.createAutoAccount(
-          customerData.email,
+          finalData.email,
           fullName,
-          customerData.phone
+          finalData.phone
         );
         
         if (accountResult) {
-          console.log('✅ User account created automatically');
+          console.log('✅ User account created automatically after payment');
           // Store account info for display in confirmation step
           finalReservationData.autoAccount = {
-            email: customerData.email,
+            email: finalData.email,
             password: accountResult.password,
             created: true
           };
         } else {
           console.log('ℹ️ User account already exists or creation skipped');
           finalReservationData.autoAccount = {
-            email: customerData.email,
+            email: finalData.email,
             created: false,
             message: 'Hesap zaten mevcut'
           };
         }
       } catch (error) {
-        console.log('⚠️ Customer account creation failed, continuing with reservation:', error);
+        console.log('⚠️ Customer account creation failed after payment, continuing:', error);
         finalReservationData.autoAccount = {
-          email: customerData.email,
+          email: finalData.email,
           created: false,
           error: 'Hesap oluşturulamadı'
         };
@@ -296,12 +307,12 @@ export default function ReservationPage() {
       setQrCode(qrCodeUrl);
       setReservationData(finalReservationData);
       
-      setCurrentStep(4);
+      setCurrentStep(5); // Go to final confirmation
       
-      toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu ve admin paneline gönderildi!');
+      toast.success('🎉 Ödeme tamamlandı! Rezervasyonunuz oluşturuldu!');
     } catch (error) {
-      toast.error('❌ Rezervasyon oluşturulurken bir hata oluştu.');
-      console.error('Reservation error:', error);
+      toast.error('❌ Ödeme işlemi sırasında hata oluştu.');
+      console.error('Payment/Reservation error:', error);
     }
   };
 
@@ -366,7 +377,7 @@ export default function ReservationPage() {
             {/* Step Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
-                {Array.from({ length: 4 }, (_, index) => (
+                {Array.from({ length: 5 }, (_, index) => (
                   <React.Fragment key={index}>
                     <div className="flex flex-col items-center">
                       <motion.div
@@ -395,7 +406,7 @@ export default function ReservationPage() {
                         {stepNames[index]}
                       </span>
                     </div>
-                    {index < 3 && (
+                    {index < 4 && (
                       <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: '0%' }}
@@ -415,7 +426,8 @@ export default function ReservationPage() {
               {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
               {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
               {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-              {currentStep === 4 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
+              {currentStep === 4 && <PaymentStep key="payment" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
+              {currentStep === 5 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
           </div>
         </div>
@@ -628,6 +640,20 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const distance = reservationData?.distance || 25; // Use real distance from Google Maps, fallback to 25km
 
+  // Filter vehicles based on passenger and baggage capacity
+  const getFilteredVehicles = () => {
+    const passengers = reservationData?.passengers || 1;
+    const baggage = reservationData?.baggage || 1;
+    
+    return vehicles.filter((vehicle: any) => {
+      const hasCapacity = vehicle.capacity >= passengers;
+      const hasBaggageSpace = vehicle.baggage >= baggage;
+      return hasCapacity && hasBaggageSpace;
+    });
+  };
+
+  const filteredVehicles = getFilteredVehicles();
+
   const getPrice = (vehicle: any) => vehicle.pricePerKm * distance;
 
   const getTotalPrice = () => {
@@ -692,24 +718,48 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
 
       {/* Vehicle Selection */}
       <div className="space-y-6">
-        <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
-          <Car className="h-6 w-6" />
-          <span>Premium Araç Seçimi</span>
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
+            <Car className="h-6 w-6" />
+            <span>Premium Araç Seçimi</span>
+          </h3>
+          <div className="bg-blue-500/20 backdrop-blur-md border border-blue-500/50 rounded-xl px-4 py-2">
+            <span className="text-blue-200 text-sm">
+              {reservationData?.passengers} yolcu, {reservationData?.baggage} bagaj için uygun araçlar
+            </span>
+          </div>
+        </div>
         
         {loadingVehicles ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             <span className="ml-3 text-white">Araçlar yükleniyor...</span>
           </div>
-        ) : vehicles.length === 0 ? (
+        ) : filteredVehicles.length === 0 ? (
           <div className="text-center py-12">
             <Car className="h-12 w-12 text-white/60 mx-auto mb-4" />
-            <p className="text-white/70">Şu anda müsait araç bulunmamaktadır.</p>
+            <p className="text-white/70 mb-2">
+              {reservationData?.passengers} yolcu ve {reservationData?.baggage} bagaj için uygun araç bulunmamaktadır.
+            </p>
+            <p className="text-white/60 text-sm">
+              Farklı yolcu/bagaj sayısı için önceki adıma dönerek tekrar deneyin.
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {vehicles.map((vehicle: any) => (
+          <>
+            {vehicles.length > filteredVehicles.length && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-4 mb-4">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-400" />
+                  <span className="text-yellow-200 text-sm">
+                    {vehicles.length - filteredVehicles.length} araç kapasitesi nedeniyle filtrelendi. 
+                    Toplam {filteredVehicles.length} uygun araç gösteriliyor.
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {filteredVehicles.map((vehicle: any) => (
             <motion.div
               key={vehicle.id}
               whileHover={{ scale: 1.02 }}
@@ -769,6 +819,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
             </motion.div>
           ))}
           </div>
+          </>
         )}
       </div>
 
