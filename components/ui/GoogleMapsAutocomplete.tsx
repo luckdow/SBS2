@@ -21,21 +21,39 @@ export default function GoogleMapsAutocomplete({
   onError,
   onStatusChange
 }: GoogleMapsAutocompleteProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | google.maps.places.PlaceAutocompleteElement | null>(null);
+  const autocompleteTypeRef = useRef<'modern' | 'legacy' | null>(null);
+  const isMountedRef = useRef(true);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [isInitialized, setIsInitialized] = useState(false);
 
   const handleError = useCallback((errorMessage: string) => {
+    if (!isMountedRef.current) return;
+    
     setError(errorMessage);
     onError?.(errorMessage);
     onStatusChange?.('error', errorMessage);
     console.error('Google Maps Autocomplete Error:', errorMessage);
   }, [onError, onStatusChange]);
 
+  const handlePlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+    if (!isMountedRef.current) return;
+    
+    if (!place.geometry || !place.geometry.location) {
+      handleError('Seçilen konum için detaylı bilgi bulunamadı.');
+      return;
+    }
+
+    const address = place.formatted_address || place.name || '';
+    onChange(address, place);
+  }, [onChange, handleError]);
+
   const initializeAutocomplete = useCallback(async () => {
-    if (!inputRef.current || autocompleteRef.current || isInitialized) {
+    if (!isMountedRef.current || !containerRef.current || autocompleteRef.current || isInitialized) {
       return;
     }
 
@@ -44,66 +62,108 @@ export default function GoogleMapsAutocomplete({
     onStatusChange?.('loading');
 
     try {
-      const autocomplete = await GoogleMapsService.createAutocomplete(inputRef.current, {
+      // Validate container element
+      await GoogleMapsService.validateElementDuringAsync(containerRef.current, 'Autocomplete initialization');
+
+      const result = await GoogleMapsService.createBestAutocomplete(containerRef.current, {
         componentRestrictions: { country: ['tr'] },
-        fields: ['place_id', 'geometry', 'name', 'formatted_address', 'types'],
-        types: ['establishment', 'geocode']
+        types: ['establishment', 'geocode'],
+        placeholder: placeholder
       });
 
-      autocompleteRef.current = autocomplete;
+      // Double-check component is still mounted
+      if (!isMountedRef.current) {
+        await GoogleMapsService.safeAutocompleteCleanup(result.element);
+        return;
+      }
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
+      autocompleteRef.current = result.element;
+      autocompleteTypeRef.current = result.type;
+
+      // Setup event listeners based on autocomplete type
+      if (result.type === 'modern') {
+        const modernElement = result.element as google.maps.places.PlaceAutocompleteElement;
         
-        if (!place.geometry || !place.geometry.location) {
-          handleError('Seçilen konum için detaylı bilgi bulunamadı.');
-          return;
+        // Add to container if it's not already there
+        if (!containerRef.current.contains(modernElement)) {
+          // Clear existing content and add the modern element
+          if (inputRef.current) {
+            inputRef.current.style.display = 'none';
+          }
+          containerRef.current.appendChild(modernElement);
         }
+        
+        modernElement.addEventListener('gmp-placeselect', (event: any) => {
+          if (!isMountedRef.current) return;
+          const place = event.place;
+          handlePlaceSelect(place);
+        });
 
-        const address = place.formatted_address || place.name || '';
-        onChange(address, place);
-      });
+        // Note: PlaceAutocompleteElement doesn't support setting initial value
+        // The modern element manages its own input state internally
+        
+      } else {
+        // Legacy autocomplete
+        const legacyAutocomplete = result.element as google.maps.places.Autocomplete;
+        
+        legacyAutocomplete.addListener('place_changed', () => {
+          if (!isMountedRef.current) return;
+          const place = legacyAutocomplete.getPlace();
+          handlePlaceSelect(place);
+        });
+      }
 
-      setIsInitialized(true);
-      onStatusChange?.('success');
+      if (isMountedRef.current) {
+        setIsInitialized(true);
+        onStatusChange?.('success');
+      }
     } catch (error) {
+      if (!isMountedRef.current) return;
+      
       const errorMessage = error instanceof Error 
         ? `Google Maps yüklenemedi: ${error.message}` 
         : 'Google Maps servisi kullanılamıyor.';
       handleError(errorMessage);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [onChange, handleError, isInitialized, onStatusChange]);
+  }, [onChange, handleError, isInitialized, onStatusChange, placeholder, value, handlePlaceSelect]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     const timer = setTimeout(() => {
-      initializeAutocomplete();
+      if (isMountedRef.current) {
+        initializeAutocomplete();
+      }
     }, 100);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      isMountedRef.current = false;
+    };
   }, [initializeAutocomplete]);
 
   // Cleanup autocomplete on unmount
   useEffect(() => {
     return () => {
-      try {
-        if (autocompleteRef.current) {
-          // Clear event listeners and references
-          google.maps.event.clearInstanceListeners(autocompleteRef.current);
-          autocompleteRef.current = null;
-        }
-      } catch (error) {
-        // Silently handle cleanup errors
-        console.warn('Autocomplete cleanup warning:', error);
+      isMountedRef.current = false;
+      if (autocompleteRef.current) {
+        GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
+        autocompleteRef.current = null;
+        autocompleteTypeRef.current = null;
       }
     };
   }, []);
 
+  // Sync input value for legacy autocomplete only
   useEffect(() => {
-    if (inputRef.current && inputRef.current.value !== value) {
+    if (autocompleteTypeRef.current === 'legacy' && inputRef.current && inputRef.current.value !== value) {
       inputRef.current.value = value;
     }
+    // Note: Modern PlaceAutocompleteElement manages its own state internally
   }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,17 +174,23 @@ export default function GoogleMapsAutocomplete({
   const handleRetry = () => {
     setError('');
     setIsInitialized(false);
-    autocompleteRef.current = null;
+    if (autocompleteRef.current) {
+      GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
+      autocompleteRef.current = null;
+      autocompleteTypeRef.current = null;
+    }
     initializeAutocomplete();
   };
 
   return (
     <div className="relative">
-      <div className="relative">
-        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+      <div className="relative" ref={containerRef}>
+        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60 z-10" />
         {isLoading && (
-          <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400 animate-spin" />
+          <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400 animate-spin z-10" />
         )}
+        
+        {/* Fallback input for legacy autocomplete or when modern element isn't ready */}
         <input
           ref={inputRef}
           type="text"
@@ -137,6 +203,9 @@ export default function GoogleMapsAutocomplete({
               ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
               : 'border-white/30 focus:border-blue-500 focus:ring-blue-500/50'
           } ${isLoading ? 'cursor-wait' : ''} ${className}`}
+          style={{
+            display: autocompleteTypeRef.current === 'modern' ? 'none' : 'block'
+          }}
         />
       </div>
 
@@ -171,7 +240,7 @@ export default function GoogleMapsAutocomplete({
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 bg-green-400 rounded-full"></div>
             <p className="text-green-200 text-sm">
-              <strong>Google Maps aktif:</strong> Yazmaya başladığınızda otomatik öneriler gösterilecek
+              <strong>Google Maps aktif:</strong> {autocompleteTypeRef.current === 'modern' ? 'Modern API' : 'Legacy API'} ile otomatik öneriler
             </p>
           </div>
         </div>

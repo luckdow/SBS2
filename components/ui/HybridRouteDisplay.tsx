@@ -35,18 +35,13 @@ export default function HybridRouteDisplay({
 
   // Cleanup function to prevent DOM manipulation errors
   const cleanup = useCallback(() => {
-    try {
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null);
-        directionsRendererRef.current = null;
-      }
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current = null;
-      }
-    } catch (error) {
-      // Silently handle cleanup errors to prevent DOM manipulation exceptions
+    // Convert async cleanup to fire-and-forget
+    GoogleMapsService.safeMapCleanup(mapInstanceRef.current, directionsRendererRef.current).catch(error => {
       console.warn('Map cleanup warning:', error);
-    }
+    });
+    
+    mapInstanceRef.current = null;
+    directionsRendererRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -74,11 +69,14 @@ export default function HybridRouteDisplay({
       setRouteInfo(null);
 
       try {
+        // Validate element before async operation
+        await GoogleMapsService.validateElementDuringAsync(mapRef.current, 'Map initialization');
+        
         // Haritayı ve rota çiziciyi oluştur
         const google = await GoogleMapsService.loadGoogleMaps();
         
         // Double-check map container still exists after async operation
-        if (!mapRef.current) {
+        if (!mapRef.current || !GoogleMapsService.safeElementCheck(mapRef.current)) {
           throw new Error('Map container became unavailable during initialization');
         }
         
@@ -105,7 +103,11 @@ export default function HybridRouteDisplay({
           originPlace?.geometry?.location || origin,
           destinationPlace?.geometry?.location || destination
         );
-        directionsRenderer.setDirections(result);
+        
+        // Final check before setting directions
+        if (directionsRenderer && GoogleMapsService.safeElementCheck(mapRef.current)) {
+          directionsRenderer.setDirections(result);
+        }
 
         // Bilgileri ayarla ve state'i güncelle
         const leg = result.routes[0].legs[0];
