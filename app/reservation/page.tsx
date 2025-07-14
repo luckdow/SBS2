@@ -61,10 +61,18 @@ export default function ReservationPage() {
       // Load vehicles from admin panel
       const vehiclesData = await vehicleService.getAll();
       const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
-      setVehicles(activeVehicles.map(vehicle => ({
+      const processedVehicles = activeVehicles.map(vehicle => ({
         ...vehicle,
         gradient: getVehicleGradient(vehicle.type || 'sedan')
-      })));
+      }));
+      
+      // Use mock data if no vehicles are found
+      if (processedVehicles.length === 0) {
+        console.log('No vehicles found in database, using mock data');
+        setVehicles(mockVehicles);
+      } else {
+        setVehicles(processedVehicles);
+      }
     } catch (error) {
       console.error('Error loading vehicles:', error);
       // Fallback to mock data
@@ -77,11 +85,19 @@ export default function ReservationPage() {
       // Load services from admin panel
       const servicesData = await serviceService.getAll();
       const activeServices = servicesData.filter(service => service.isActive !== false);
-      setServices(activeServices.map(service => ({
+      const processedServices = activeServices.map(service => ({
         ...service,
         icon: getServiceIcon(service.category || 'extra'),
         gradient: getServiceGradient(service.category || 'extra')
-      })));
+      }));
+      
+      // Use mock data if no services are found
+      if (processedServices.length === 0) {
+        console.log('No services found in database, using mock data');
+        setServices(mockServices);
+      } else {
+        setServices(processedServices);
+      }
     } catch (error) {
       console.error('Error loading services:', error);
       // Fallback to mock data
