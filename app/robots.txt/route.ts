@@ -15,7 +15,7 @@ Allow: /
 Allow: /reservation
 Allow: /about
 Allow: /contact
-Allow: /login
+Allow: /auth/signin
 Allow: /register
 Allow: /privacy-policy
 Allow: /terms-of-service

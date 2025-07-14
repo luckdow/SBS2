@@ -86,7 +86,7 @@ export default function RegisterPage() {
         await AuthService.createUserProfile(user, additionalData);
         
         toast.success('🎉 Kayıt başarılı! Giriş yapabilirsiniz.');
-        router.push('/login');
+        router.push('/auth/signin');
       }
     } catch (error: any) {
       console.error('Register error:', error);
@@ -120,7 +120,7 @@ export default function RegisterPage() {
         });
         
         toast.success('🎉 Google ile kayıt başarılı!');
-        router.push('/login');
+        router.push('/auth/signin');
       }
     } catch (error: any) {
       console.error('Google register error:', error);
@@ -457,7 +457,7 @@ export default function RegisterPage() {
             <div className="mt-6 text-center">
               <p className="text-white/70">
                 Zaten hesabınız var mı?{' '}
-                <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
+                <Link href="/auth/signin" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
                   Giriş Yapın
                 </Link>
               </p>

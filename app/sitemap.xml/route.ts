@@ -26,7 +26,7 @@ export async function GET() {
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://sbstravel.com/login</loc>
+    <loc>https://sbstravel.com/auth/signin</loc>
     <lastmod>2024-01-15T00:00:00.000Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

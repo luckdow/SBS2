@@ -1462,7 +1462,7 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
             Ana Sayfaya Dön
           </Link>
           {reservationData.autoAccount?.created ? (
-            <Link href="/login" className="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-medium text-lg rounded-xl hover:from-green-600 hover:to-blue-700 transition-all shadow-lg">
+            <Link href="/auth/signin" className="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-medium text-lg rounded-xl hover:from-green-600 hover:to-blue-700 transition-all shadow-lg">
               <Users className="h-5 w-5 mr-2" />
               Hesabıma Giriş Yap
               <Sparkles className="h-4 w-4 ml-2 animate-pulse" />
