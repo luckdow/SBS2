@@ -27,28 +27,95 @@ import {
   Sparkles,
   Crown,
   Target,
-  Zap
+  Zap,
+  LogOut
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { AuthService } from '../../lib/services/authService';
+import { User as AppUser } from '../../lib/types';
+import toast from 'react-hot-toast';
 
 export default function CustomerDashboard() {
   const [reservations, setReservations] = useState<any[]>([]);
-  const [customerStats, setCustomerStats] = useState({
-    totalTrips: 24,
-    totalSpent: 8450,
-    loyaltyPoints: 1250,
-    membershipLevel: 'Gold',
-    avgRating: 4.8,
-    savedAmount: 340
-  });
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  // Mock customer data
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = AuthService.getCurrentUser();
+      if (!user) {
+        router.push('/auth/signin');
+        return;
+      }
+
+      try {
+        const profile = await AuthService.getUserProfile(user);
+        if (profile) {
+          setCurrentUser(profile);
+          
+          // Check if user has the right role for this page
+          if (profile.role !== 'customer') {
+            toast.error('Bu sayfaya erişim yetkiniz bulunmamaktadır!');
+            router.push(AuthService.getDashboardRoute(profile.role));
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+        toast.error('Profil bilgileri yüklenirken hata oluştu!');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  const handleSignOut = async () => {
+    try {
+      await AuthService.signOut();
+      toast.success('Çıkış yapıldı!');
+      router.push('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast.error('Çıkış yapılırken hata oluştu!');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null; // Will redirect to signin
+  }
+
+  // Use real user data instead of mock data
+  const customerStats = {
+    totalTrips: (currentUser as any).totalReservations || 0,
+    totalSpent: (currentUser as any).totalSpent || 0,
+    loyaltyPoints: (currentUser as any).loyaltyPoints || 0,
+    membershipLevel: (currentUser as any).membershipLevel || 'Bronze',
+    avgRating: (currentUser as any).avgRating || 5.0,
+    savedAmount: (currentUser as any).savedAmount || 0
+  };
+
+  // Use real customer info instead of mock data
   const customerInfo = {
-    name: 'Ahmet Yılmaz',
-    email: 'ahmet@email.com',
-    phone: '+90 532 123 4567',
-    memberSince: '2023-01-15',
-    avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150'
+    name: currentUser.name,
+    email: currentUser.email,
+    phone: currentUser.phone || 'Belirtilmemiş',
+    memberSince: new Date(currentUser.createdAt).toLocaleDateString('tr-TR'),
+    avatar: (currentUser as any).avatar || null
   };
 
   // Mock reservations
@@ -193,9 +260,18 @@ export default function CustomerDashboard() {
                 />
                 <span className="text-white font-medium">{customerInfo.name}</span>
               </div>
-              <Link href="/" className="text-white/60 hover:text-white/80 transition-colors">
-                ← Ana Sayfa
-              </Link>
+              <div className="flex items-center space-x-4">
+                <Link href="/" className="text-white/60 hover:text-white/80 transition-colors">
+                  ← Ana Sayfa
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center space-x-2 text-white/60 hover:text-white/80 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Çıkış</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

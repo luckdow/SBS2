@@ -11,6 +11,7 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../firebase';
+import { User as AppUser } from '../types';
 
 export class AuthService {
   private static googleProvider = new GoogleAuthProvider();
@@ -100,6 +101,153 @@ export class AuthService {
       return userProfile;
     } catch (error) {
       console.error('Error creating user profile:', error);
+      throw error;
+    }
+  }
+
+  // Get user role from their profile data or determine based on email patterns
+  static async getUserRole(user: User): Promise<'admin' | 'driver' | 'customer'> {
+    try {
+      if (!user || !user.email) {
+        return 'customer'; // Default role
+      }
+
+      const email = user.email.toLowerCase();
+      
+      // Check for predefined admin/demo accounts
+      if (email === 'admin@sbstravel.com') {
+        return 'admin';
+      }
+      
+      if (email === 'sofor@sbstravel.com' || email.includes('driver') || email.includes('sofor')) {
+        return 'driver';
+      }
+      
+      // Check database for user role (in a real app, this would query Firestore)
+      // For now, we'll use email pattern matching and default to customer
+      const userProfile = await this.getUserProfile(user);
+      return userProfile?.role || 'customer';
+    } catch (error) {
+      console.error('Error getting user role:', error);
+      return 'customer'; // Default fallback
+    }
+  }
+
+  // Get user profile information
+  static async getUserProfile(user: User): Promise<AppUser | null> {
+    try {
+      if (!user) {
+        return null;
+      }
+
+      // In a real app, this would query Firestore/database
+      // For now, we'll create a profile based on available user data
+      const email = user.email?.toLowerCase() || '';
+      
+      let role: 'admin' | 'driver' | 'customer' = 'customer';
+      let additionalData: any = {};
+
+      // Determine role and additional data based on email or other criteria
+      if (email === 'admin@sbstravel.com') {
+        role = 'admin';
+        additionalData = {
+          name: 'Admin User',
+          phone: '+90 532 000 0001'
+        };
+      } else if (email === 'sofor@sbstravel.com') {
+        role = 'driver';
+        additionalData = {
+          name: 'Demo Şoför',
+          phone: '+90 532 000 0002',
+          licenseNumber: 'DR123456',
+          vehicleType: 'sedan',
+          vehiclePlate: '34 ABC 123',
+          isActive: true,
+          rating: 4.8,
+          totalTrips: 156,
+          monthlyEarnings: 12450
+        };
+      } else if (email === 'musteri@sbstravel.com') {
+        role = 'customer';
+        additionalData = {
+          name: 'Demo Müşteri',
+          phone: '+90 532 000 0003',
+          totalReservations: 24,
+          preferredVehicle: 'sedan'
+        };
+      } else {
+        // For Google users or other registered users, use their display name
+        additionalData = {
+          name: user.displayName || user.email?.split('@')[0] || 'User',
+          phone: user.phoneNumber || ''
+        };
+      }
+
+      const profile: AppUser = {
+        id: user.uid,
+        email: user.email || '',
+        name: additionalData.name,
+        role,
+        phone: additionalData.phone,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...additionalData
+      };
+
+      return profile;
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return null;
+    }
+  }
+
+  // Get the appropriate dashboard route based on user role
+  static getDashboardRoute(role: 'admin' | 'driver' | 'customer'): string {
+    switch (role) {
+      case 'admin':
+        return '/admin';
+      case 'driver':
+        return '/driver';
+      case 'customer':
+      default:
+        return '/customer';
+    }
+  }
+
+  // Enhanced sign-in with automatic role detection and redirection
+  static async signInAndRedirect(email: string, password: string): Promise<{ user: User; role: string; redirectUrl: string } | null> {
+    try {
+      const user = await this.signInWithEmail(email, password);
+      
+      if (user) {
+        const role = await this.getUserRole(user);
+        const redirectUrl = this.getDashboardRoute(role);
+        
+        return { user, role, redirectUrl };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Sign-in with redirect error:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced Google sign-in with automatic role detection and redirection
+  static async signInWithGoogleAndRedirect(): Promise<{ user: User; role: string; redirectUrl: string } | null> {
+    try {
+      const user = await this.signInWithGoogle();
+      
+      if (user) {
+        const role = await this.getUserRole(user);
+        const redirectUrl = this.getDashboardRoute(role);
+        
+        return { user, role, redirectUrl };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Google sign-in with redirect error:', error);
       throw error;
     }
   }

@@ -77,7 +77,7 @@ export default function HomePage() {
                 Rezervasyon
               </Link>
               <Link 
-                href="/login" 
+                href="/auth/signin" 
                 className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-6 py-2 rounded-full hover:bg-white/20 transition-all duration-300"
               >
                 Giriş
@@ -361,7 +361,7 @@ export default function HomePage() {
             
             <div className="flex items-center space-x-4 mt-4">
               <Link 
-                href="/login" 
+                href="/auth/signin" 
                 className="text-white/80 hover:text-white font-medium transition-colors"
               >
                 Giriş Yap

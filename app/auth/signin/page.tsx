@@ -22,7 +22,6 @@ import { AuthService } from '../../../lib/services/authService';
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [loginType, setLoginType] = useState<'customer' | 'driver' | 'admin'>('customer');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -35,22 +34,11 @@ export default function SignInPage() {
     setLoading(true);
     
     try {
-      const user = await AuthService.signInWithEmail(formData.email, formData.password);
+      const result = await AuthService.signInAndRedirect(formData.email, formData.password);
       
-      if (user) {
-        toast.success('🎉 Giriş başarılı!');
-        
-        // Role-based redirection
-        switch (loginType) {
-          case 'admin':
-            router.push('/admin');
-            break;
-          case 'driver':
-            router.push('/driver');
-            break;
-          default:
-            router.push('/customer');
-        }
+      if (result) {
+        toast.success(`🎉 Giriş başarılı! ${result.role} paneline yönlendiriliyorsunuz...`);
+        router.push(result.redirectUrl);
       }
     } catch (error: any) {
       console.error('Sign-in error:', error);
@@ -76,22 +64,11 @@ export default function SignInPage() {
     setLoading(true);
     
     try {
-      const user = await AuthService.signInWithGoogle();
+      const result = await AuthService.signInWithGoogleAndRedirect();
       
-      if (user) {
-        toast.success('🎉 Google ile giriş başarılı!');
-        
-        // Role-based redirection
-        switch (loginType) {
-          case 'admin':
-            router.push('/admin');
-            break;
-          case 'driver':
-            router.push('/driver');
-            break;
-          default:
-            router.push('/customer');
-        }
+      if (result) {
+        toast.success(`🎉 Google ile giriş başarılı! ${result.role} paneline yönlendiriliyorsunuz...`);
+        router.push(result.redirectUrl);
       }
     } catch (error: any) {
       console.error('Google sign-in error:', error);
@@ -108,30 +85,6 @@ export default function SignInPage() {
       setLoading(false);
     }
   };
-
-  const loginTypes = [
-    {
-      id: 'customer',
-      name: 'Müşteri',
-      icon: User,
-      description: 'Rezervasyon yap ve yolculuklarını takip et',
-      gradient: 'from-blue-500 to-purple-600'
-    },
-    {
-      id: 'driver',
-      name: 'Şoför',
-      icon: Car,
-      description: 'Görevlerini gör ve kazancını takip et',
-      gradient: 'from-green-500 to-blue-600'
-    },
-    {
-      id: 'admin',
-      name: 'Yönetici',
-      icon: Settings,
-      description: 'Sistemi yönet ve raporları görüntüle',
-      gradient: 'from-orange-500 to-red-600'
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -184,43 +137,14 @@ export default function SignInPage() {
                 Hoş Geldiniz
               </span>
             </h1>
-            <p className="text-white/70">Hesabınıza giriş yapın</p>
-          </motion.div>
-
-          {/* Login Type Selection */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-8"
-          >
-            <div className="grid grid-cols-3 gap-2 p-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-              {loginTypes.map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => setLoginType(type.id as any)}
-                  disabled={loading}
-                  className={`p-3 rounded-xl transition-all duration-300 ${
-                    loginType === type.id
-                      ? `bg-gradient-to-r ${type.gradient} text-white shadow-lg`
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
-                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <type.icon className="h-5 w-5 mx-auto mb-1" />
-                  <span className="text-xs font-medium">{type.name}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-center text-white/60 text-sm mt-3">
-              {loginTypes.find(t => t.id === loginType)?.description}
-            </p>
+            <p className="text-white/70">Hesabınıza giriş yapın ve otomatik olarak rolünüze uygun panele yönlendirileceksiniz</p>
           </motion.div>
 
           {/* Login Form */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.1 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-8"
           >
             <form onSubmit={handleSignIn} className="space-y-6">
@@ -318,6 +242,17 @@ export default function SignInPage() {
               )}
               <span>Google ile Giriş Yap</span>
             </button>
+
+            {/* Demo Accounts */}
+            <div className="mt-6 p-4 bg-blue-500/20 border border-blue-500/50 rounded-xl">
+              <h4 className="font-semibold text-blue-200 mb-2">Demo Hesaplar (Otomatik Rol Algılama)</h4>
+              <div className="space-y-1 text-blue-100 text-sm">
+                <p>• <strong>Admin:</strong> admin@sbstravel.com / admin123</p>
+                <p>• <strong>Şoför:</strong> sofor@sbstravel.com / sofor123</p>
+                <p>• <strong>Müşteri:</strong> musteri@sbstravel.com / musteri123</p>
+                <p className="text-blue-200 text-xs mt-2">Giriş yaptığınızda rolünüz otomatik algılanacak ve ilgili panele yönlendirileceksiniz.</p>
+              </div>
+            </div>
 
             {/* Register Link */}
             <div className="mt-6 text-center">
