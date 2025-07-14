@@ -1,21 +1,49 @@
-// Google Maps API Integration
+// Google Maps API Integration - Singleton Service
 export class GoogleMapsService {
+  private static instance: GoogleMapsService | null = null;
   private static apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   private static cache = new Map();
   private static cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  private static isInitialized = false;
+
+  // Singleton pattern implementation
+  private constructor() {}
+
+  static getInstance(): GoogleMapsService {
+    if (!this.instance) {
+      this.instance = new GoogleMapsService();
+    }
+    return this.instance;
+  }
 
   // Check if API key is configured
   static isConfigured(): boolean {
     return !!this.apiKey && this.apiKey !== 'your_google_maps_api_key_here';
   }
 
-  // Enhanced API validation with specific service testing
+  // Check if Google Maps JavaScript API is loaded and ready
+  static isApiReady(): boolean {
+    return (
+      typeof window !== 'undefined' &&
+      window.google &&
+      window.google.maps &&
+      window.google.maps.places &&
+      this.isInitialized
+    );
+  }
+
+  // Initialize services when API is loaded
+  static markAsInitialized(): void {
+    this.isInitialized = true;
+  }
+
+  // Enhanced API validation using browser-based services only
   static async validateApiConfiguration(): Promise<{
     isValid: boolean;
     results: {
-      geocoding: { status: string; error?: string };
-      directions: { status: string; error?: string };
-      places: { status: string; error?: string };
+      javascriptApi: { status: string; error?: string };
+      placesApi: { status: string; error?: string };
+      mapsApi: { status: string; error?: string };
     };
     recommendations: string[];
   }> {
@@ -23,9 +51,9 @@ export class GoogleMapsService {
       return {
         isValid: false,
         results: {
-          geocoding: { status: 'NOT_CONFIGURED', error: 'API key not configured' },
-          directions: { status: 'NOT_CONFIGURED', error: 'API key not configured' },
-          places: { status: 'NOT_CONFIGURED', error: 'API key not configured' }
+          javascriptApi: { status: 'NOT_CONFIGURED', error: 'API key not configured' },
+          placesApi: { status: 'NOT_CONFIGURED', error: 'API key not configured' },
+          mapsApi: { status: 'NOT_CONFIGURED', error: 'API key not configured' }
         },
         recommendations: [
           'Configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local file',
@@ -35,9 +63,9 @@ export class GoogleMapsService {
     }
 
     const results = {
-      geocoding: await this.testGeocodingApi(),
-      directions: await this.testDirectionsApi(), 
-      places: await this.testPlacesApi()
+      javascriptApi: await this.testJavaScriptApi(),
+      placesApi: await this.testPlacesJavaScriptApi(),
+      mapsApi: await this.testMapsJavaScriptApi()
     };
 
     const isValid = Object.values(results).every(result => result.status === 'OK');
@@ -46,42 +74,45 @@ export class GoogleMapsService {
     return { isValid, results, recommendations };
   }
 
-  // Test Geocoding API
-  private static async testGeocodingApi(): Promise<{ status: string; error?: string }> {
+  // Test JavaScript API availability
+  private static async testJavaScriptApi(): Promise<{ status: string; error?: string }> {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=Antalya,Turkey&key=${this.apiKey}`
-      );
-      const data = await response.json();
-      return { status: data.status, error: data.error_message };
+      if (!this.isApiReady()) {
+        return { status: 'NOT_LOADED', error: 'Google Maps JavaScript API not loaded' };
+      }
+      return { status: 'OK' };
     } catch (error) {
-      return { status: 'NETWORK_ERROR', error: 'Failed to connect to Geocoding API' };
+      return { status: 'ERROR', error: 'JavaScript API test failed' };
     }
   }
 
-  // Test Directions API
-  private static async testDirectionsApi(): Promise<{ status: string; error?: string }> {
+  // Test Places JavaScript API
+  private static async testPlacesJavaScriptApi(): Promise<{ status: string; error?: string }> {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=Antalya+Airport&destination=Lara+Beach&key=${this.apiKey}`
-      );
-      const data = await response.json();
-      return { status: data.status, error: data.error_message };
+      if (!this.isApiReady()) {
+        return { status: 'NOT_LOADED', error: 'Places API not loaded' };
+      }
+      if (!window.google.maps.places.AutocompleteService) {
+        return { status: 'MISSING_SERVICE', error: 'AutocompleteService not available' };
+      }
+      return { status: 'OK' };
     } catch (error) {
-      return { status: 'NETWORK_ERROR', error: 'Failed to connect to Directions API' };
+      return { status: 'ERROR', error: 'Places API test failed' };
     }
   }
 
-  // Test Places API (Note: Web Service API, not JavaScript API)
-  private static async testPlacesApi(): Promise<{ status: string; error?: string }> {
+  // Test Maps JavaScript API
+  private static async testMapsJavaScriptApi(): Promise<{ status: string; error?: string }> {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=Antalya+Airport&key=${this.apiKey}`
-      );
-      const data = await response.json();
-      return { status: data.status, error: data.error_message };
+      if (!this.isApiReady()) {
+        return { status: 'NOT_LOADED', error: 'Maps API not loaded' };
+      }
+      if (!window.google.maps.DirectionsService) {
+        return { status: 'MISSING_SERVICE', error: 'DirectionsService not available' };
+      }
+      return { status: 'OK' };
     } catch (error) {
-      return { status: 'NETWORK_ERROR', error: 'Failed to connect to Places API' };
+      return { status: 'ERROR', error: 'Maps API test failed' };
     }
   }
 
@@ -109,7 +140,7 @@ export class GoogleMapsService {
     return recommendations;
   }
 
-  // Calculate distance between two points
+  // Calculate distance between two points using browser-based APIs only
   static async calculateDistance(origin: string, destination: string): Promise<{
     distance: number;
     duration: string;
@@ -131,8 +162,8 @@ export class GoogleMapsService {
         return this.getFallbackDistance(origin, destination);
       }
 
-      // Check if Google Maps JavaScript API is loaded
-      if (typeof window !== 'undefined' && window.google && window.google.maps) {
+      // Use browser-based Distance Matrix Service
+      if (this.isApiReady() && window.google.maps.DistanceMatrixService) {
         return new Promise((resolve) => {
           const service = new window.google.maps.DistanceMatrixService();
           
@@ -142,9 +173,12 @@ export class GoogleMapsService {
             travelMode: window.google.maps.TravelMode.DRIVING,
             unitSystem: window.google.maps.UnitSystem.METRIC,
             language: 'tr',
-            region: 'TR'
+            region: 'TR',
+            avoidHighways: false,
+            avoidTolls: false
           }, (response: any, status: any) => {
-            if (status === window.google.maps.DistanceMatrixStatus.OK && response.rows[0].elements[0].status === 'OK') {
+            if (status === window.google.maps.DistanceMatrixStatus.OK && 
+                response.rows[0].elements[0].status === 'OK') {
               const element = response.rows[0].elements[0];
               const result = {
                 distance: Math.round(element.distance.value / 1000), // Convert to KM
@@ -159,49 +193,61 @@ export class GoogleMapsService {
                 timestamp: Date.now()
               });
               
-              console.log('📍 Distance calculated:', result.distance, 'km');
+              console.log('📍 Distance calculated via DistanceMatrix API:', result.distance, 'km');
               resolve(result);
             } else {
-              console.warn('🗺️ Google Maps DistanceMatrix API error:', status);
+              console.warn('🗺️ DistanceMatrix API error:', status);
               resolve(this.getFallbackDistance(origin, destination));
             }
           });
         });
       } else {
-        console.warn('🗺️ Google Maps JavaScript API not loaded, using fallback');
+        console.warn('🗺️ Google Maps DistanceMatrix API not available, using fallback');
         return this.getFallbackDistance(origin, destination);
       }
     } catch (error) {
-      console.error('🗺️ Google Maps API Error:', error);
+      console.error('🗺️ Distance calculation error:', error);
       return this.getFallbackDistance(origin, destination);
     }
   }
 
-  // Get address suggestions with autocomplete
-  static async getAddressSuggestions(input: string): Promise<{
+  // Get address suggestions with autocomplete using browser-based APIs only
+  static async getAddressSuggestions(input: string, includePopular: boolean = true): Promise<{
     suggestions: string[];
+    popularDestinations?: string[];
     status: 'success' | 'error';
     error?: string;
   }> {
-    if (!input || input.length < 3) {
-      return { suggestions: [], status: 'success' };
+    if (!input || input.length < 2) {
+      return {
+        suggestions: [],
+        popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
+        status: 'success'
+      };
     }
 
     // Check cache first
     const cacheKey = `autocomplete-${input}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      return cached.data;
+      return {
+        ...cached.data,
+        popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+      };
     }
 
     try {
       if (!this.isConfigured()) {
         console.warn('🗺️ Google Maps API key not configured, using fallback suggestions');
-        return this.getFallbackSuggestions(input);
+        return {
+          suggestions: this.getFallbackSuggestions(input).suggestions,
+          popularDestinations: includePopular ? this.getPopularDestinations() : undefined,
+          status: 'success'
+        };
       }
 
-      // Use browser-based Places AutocompleteService to avoid CORS issues
-      if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places) {
+      // Use browser-based Places AutocompleteService only
+      if (this.isApiReady() && window.google.maps.places.AutocompleteService) {
         return new Promise((resolve) => {
           const service = new window.google.maps.places.AutocompleteService();
           
@@ -209,7 +255,12 @@ export class GoogleMapsService {
             input: input,
             componentRestrictions: { country: 'tr' },
             language: 'tr',
-            types: ['establishment', 'geocode']
+            types: ['establishment', 'geocode'],
+            // Focus on Antalya region
+            locationBias: {
+              center: { lat: 36.8969, lng: 30.7133 },
+              radius: 100000 // 100km radius around Antalya
+            }
           }, (predictions: any, status: any) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
               const result = {
@@ -224,32 +275,70 @@ export class GoogleMapsService {
               });
               
               console.log('🗺️ Address suggestions fetched via Places AutocompleteService:', result.suggestions.length, 'results');
-              resolve(result);
+              resolve({
+                ...result,
+                popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+              });
             } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
               const result = { suggestions: [], status: 'success' as const };
               this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
-              resolve(result);
+              resolve({
+                ...result,
+                popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+              });
             } else {
               console.warn('🗺️ Places AutocompleteService error:', status);
-              resolve(this.getFallbackSuggestions(input));
+              const fallback = this.getFallbackSuggestions(input);
+              resolve({
+                ...fallback,
+                popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+              });
             }
           });
         });
       } else {
-        console.warn('🗺️ Google Maps Places API not loaded, using fallback suggestions');
-        return this.getFallbackSuggestions(input);
+        console.warn('🗺️ Google Maps Places AutocompleteService not available, using fallback');
+        const fallback = this.getFallbackSuggestions(input);
+        return {
+          ...fallback,
+          popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+        };
       }
     } catch (error) {
-      console.error('🗺️ Google Places Autocomplete Error:', error);
-      return this.getFallbackSuggestions(input);
+      console.error('🗺️ Places Autocomplete Error:', error);
+      const fallback = this.getFallbackSuggestions(input);
+      return {
+        ...fallback,
+        popularDestinations: includePopular ? this.getPopularDestinations() : undefined
+      };
     }
   }
 
-  // Get route visualization data
+  // Get popular Turkish destinations
+  static getPopularDestinations(): string[] {
+    return [
+      'Antalya Havalimanı Terminal 1',
+      'Antalya Havalimanı Terminal 2',
+      'Lara Beach, Antalya',
+      'Konyaaltı Beach, Antalya',
+      'Kaleiçi, Antalya',
+      'Kemer Marina, Antalya',
+      'Side Antik Tiyatro, Manavgat',
+      'Belek Golf Resort, Serik',
+      'Aspendos Antik Tiyatrosu, Serik',
+      'Düden Şelalesi, Antalya',
+      'Köprülü Kanyon Milli Parkı',
+      'Olympos Antik Kenti, Kumluca'
+    ];
+  }
+
+  // Get route visualization data using browser-based APIs only
   static async getRouteVisualization(origin: string, destination: string): Promise<{
     polyline?: string;
     bounds?: any;
     steps?: any[];
+    distance?: number;
+    duration?: string;
     status: 'success' | 'error';
     error?: string;
   }> {
@@ -261,48 +350,68 @@ export class GoogleMapsService {
         };
       }
 
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&key=${this.apiKey}&language=tr`
-      );
-      
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('API anahtarı geçersiz veya domain kısıtlaması mevcut');
-        } else if (response.status === 429) {
-          throw new Error('API kullanım limitine ulaşıldı');
-        } else {
-          throw new Error(`HTTP hatası: ${response.status}`);
-        }
-      }
-      
-      const data = await response.json();
-      
-      if (data.status === 'OK' && data.routes.length > 0) {
-        const route = data.routes[0];
-        return {
-          polyline: route.overview_polyline.points,
-          bounds: route.bounds,
-          steps: route.legs[0].steps,
-          status: 'success'
-        };
-      } else if (data.status === 'ZERO_RESULTS') {
-        return { 
-          status: 'error', 
-          error: 'Bu lokasyonlar arasında rota bulunamadı' 
-        };
-      } else if (data.status === 'REQUEST_DENIED') {
-        return { 
-          status: 'error', 
-          error: 'Google Maps API erişimi reddedildi. API anahtarını kontrol edin.' 
-        };
+      // Use browser-based DirectionsService only
+      if (this.isApiReady() && window.google.maps.DirectionsService) {
+        return new Promise((resolve) => {
+          const directionsService = new window.google.maps.DirectionsService();
+          
+          directionsService.route({
+            origin: origin,
+            destination: destination,
+            travelMode: window.google.maps.TravelMode.DRIVING,
+            unitSystem: window.google.maps.UnitSystem.METRIC,
+            region: 'TR',
+            language: 'tr',
+            optimizeWaypoints: false,
+            avoidHighways: false,
+            avoidTolls: false
+          }, (result: any, status: any) => {
+            if (status === 'OK' && result.routes.length > 0) {
+              const route = result.routes[0];
+              const leg = route.legs[0];
+              
+              const routeData = {
+                polyline: route.overview_polyline.points,
+                bounds: route.bounds,
+                steps: leg.steps,
+                distance: Math.round(leg.distance.value / 1000), // Convert to km
+                duration: leg.duration.text,
+                status: 'success' as const
+              };
+              
+              console.log('🗺️ Route calculated via DirectionsService:', routeData.distance, 'km');
+              resolve(routeData);
+            } else {
+              let userFriendlyError = 'Rota hesaplanamadı';
+              
+              if (status === 'ZERO_RESULTS') {
+                userFriendlyError = 'Bu lokasyonlar arasında rota bulunamadı';
+              } else if (status === 'REQUEST_DENIED') {
+                userFriendlyError = 'Google Maps API erişimi reddedildi. API anahtarını kontrol edin.';
+              } else if (status === 'INVALID_REQUEST') {
+                userFriendlyError = 'Geçersiz rota talebi';
+              } else if (status === 'OVER_QUERY_LIMIT') {
+                userFriendlyError = 'Google Maps kullanım limitine ulaşıldı';
+              } else {
+                userFriendlyError = `Rota servisi hatası: ${status}`;
+              }
+              
+              console.warn('🗺️ DirectionsService error:', status);
+              resolve({ 
+                status: 'error', 
+                error: userFriendlyError 
+              });
+            }
+          });
+        });
       } else {
         return { 
           status: 'error', 
-          error: `Rota hesaplanamadı: ${data.status}` 
+          error: 'Google Maps DirectionsService henüz yüklenmedi. Lütfen birkaç saniye bekleyin.' 
         };
       }
     } catch (error) {
-      console.error('🗺️ Google Directions API Error:', error);
+      console.error('🗺️ Route visualization error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata oluştu';
       return { 
         status: 'error', 
@@ -350,36 +459,92 @@ export class GoogleMapsService {
     };
   }
 
-  // Fallback address suggestions
+  // Enhanced fallback address suggestions
   private static getFallbackSuggestions(input: string) {
     const turkishLocations = [
+      // Airports
       'Antalya Havalimanı Terminal 1',
       'Antalya Havalimanı Terminal 2',
-      'Lara Beach Hotel, Antalya',
+      'Antalya Havalimanı Dış Hatlar',
+      'Antalya Havalimanı İç Hatlar',
+      
+      // Beaches and Coastal Areas
       'Lara Beach, Antalya',
       'Lara Kundu Beach',
       'Konyaaltı Beach, Antalya',
-      'Kemer Marina, Antalya',
-      'Side Antik Tiyatro, Antalya',
-      'Belek Golf Resort, Antalya',
+      'Kleopatra Beach, Alanya',
+      'Patara Beach, Kaş',
+      'Olympos Beach, Kumluca',
+      'Çıralı Beach, Kemer',
+      
+      // Tourist Areas
       'Kaleiçi, Antalya',
       'Antalya Şehir Merkezi',
-      'Aspendos Antik Tiyatrosu, Antalya',
+      'Kemer Marina, Antalya',
+      'Side Antik Tiyatro, Manavgat',
+      'Belek Golf Resort, Serik',
+      'Alanya Kalesi',
+      'Manavgat Şelalesi',
+      'Köprülü Kanyon Milli Parkı',
+      
+      // Historical Sites
+      'Aspendos Antik Tiyatrosu, Serik',
+      'Perge Antik Kenti, Aksu',
+      'Termessos Antik Kenti',
+      'Olympos Antik Kenti, Kumluca',
+      'Phaselis Antik Kenti, Kemer',
+      'Myra Antik Kenti, Demre',
+      
+      // Natural Attractions
       'Düden Şelalesi, Antalya',
-      'Köprülü Kanyon, Antalya',
-      'Olympos Antik Kenti, Antalya'
+      'Kurşunlu Şelalesi',
+      'Saklıkent Milli Parkı',
+      'Kaputaş Beach, Kaş',
+      'Damlataş Mağarası, Alanya',
+      
+      // Hotels and Resorts (Popular Areas)
+      'Lara Resort Hotels',
+      'Belek Resort Hotels',
+      'Kemer Resort Hotels',
+      'Side Resort Hotels',
+      'Alanya Resort Hotels',
+      'Kaş Boutique Hotels',
+      
+      // Districts
+      'Muratpaşa, Antalya',
+      'Kepez, Antalya',
+      'Döşemealtı, Antalya',
+      'Akdeniz Üniversitesi, Antalya',
+      'Antalya AVM',
+      'MarkAntalya AVM',
+      'TerraCity AVM'
     ];
     
     const lowerInput = input.toLowerCase();
     const suggestions = turkishLocations.filter(location => 
       location.toLowerCase().includes(lowerInput) ||
-      location.toLowerCase().replace(/[,\s]/g, '').includes(lowerInput.replace(/[,\s]/g, ''))
+      location.toLowerCase().replace(/[,\s]/g, '').includes(lowerInput.replace(/[,\s]/g, '')) ||
+      this.turkishCharacterMatch(location.toLowerCase(), lowerInput)
     );
     
     return {
-      suggestions: suggestions.slice(0, 8),
+      suggestions: suggestions.slice(0, 10),
       status: 'success' as const
     };
+  }
+
+  // Helper method for Turkish character matching
+  private static turkishCharacterMatch(text: string, search: string): boolean {
+    const turkishMap: { [key: string]: string } = {
+      'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+      'c': 'ç', 'g': 'ğ', 'i': 'ı', 'o': 'ö', 's': 'ş', 'u': 'ü'
+    };
+    
+    const normalizeText = (str: string) => {
+      return str.split('').map(char => turkishMap[char] || char).join('');
+    };
+    
+    return normalizeText(text).includes(normalizeText(search));
   }
 
   // Clear cache (useful for development)

@@ -20,7 +20,9 @@ export default function AddressAutocomplete({
   className = '' 
 }: AddressAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [popularDestinations, setPopularDestinations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showPopular, setShowPopular] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [apiError, setApiError] = useState<string>('');
@@ -54,14 +56,18 @@ export default function AddressAutocomplete({
       
       timeoutRef.current = setTimeout(async () => {
         setLoading(true);
+        setShowPopular(false);
         try {
-          const results = await GoogleMapsService.getAddressSuggestions(value);
+          const results = await GoogleMapsService.getAddressSuggestions(value, true);
           if (results.status === 'success') {
             setSuggestions(results.suggestions);
+            if (results.popularDestinations) {
+              setPopularDestinations(results.popularDestinations);
+            }
             setShowSuggestions(true);
           } else {
             console.error('Address autocomplete error:', results.error);
-            // Enhanced fallback suggestions for demo
+            // Use fallback with popular destinations
             const fallbackSuggestions = [
               'Antalya Havalimanı Terminal 1',
               'Antalya Havalimanı Terminal 2', 
@@ -76,7 +82,7 @@ export default function AddressAutocomplete({
           }
         } catch (error) {
           console.error('Address autocomplete error:', error);
-          // Enhanced fallback suggestions for demo
+          // Enhanced fallback suggestions
           const fallbackSuggestions = [
             'Antalya Havalimanı Terminal 1',
             'Antalya Havalimanı Terminal 2',
@@ -91,9 +97,16 @@ export default function AddressAutocomplete({
         }
         setLoading(false);
       }, 300);
+    } else if (value.length === 0) {
+      // Show popular destinations when input is empty
+      setSuggestions([]);
+      setPopularDestinations(GoogleMapsService.getPopularDestinations());
+      setShowPopular(true);
+      setShowSuggestions(false);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
+      setShowPopular(false);
     }
 
     return () => {
@@ -106,12 +119,24 @@ export default function AddressAutocomplete({
   const handleSuggestionClick = (suggestion: string) => {
     onChange(suggestion);
     setShowSuggestions(false);
+    setShowPopular(false);
     setSuggestions([]);
   };
 
   const handleBlur = () => {
     // Delay hiding suggestions to allow click
-    setTimeout(() => setShowSuggestions(false), 200);
+    setTimeout(() => {
+      setShowSuggestions(false);
+      setShowPopular(false);
+    }, 200);
+  };
+
+  const handleFocus = () => {
+    if (suggestions.length > 0) {
+      setShowSuggestions(true);
+    } else if (value.length === 0 && popularDestinations.length > 0) {
+      setShowPopular(true);
+    }
   };
 
   return (
@@ -124,7 +149,7 @@ export default function AddressAutocomplete({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={handleBlur}
-          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onFocus={handleFocus}
           placeholder={placeholder}
           className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all ${className}`}
         />
@@ -135,25 +160,50 @@ export default function AddressAutocomplete({
         )}
       </div>
 
-      {showSuggestions && suggestions.length > 0 && (
+      {(showSuggestions && suggestions.length > 0) || (showPopular && popularDestinations.length > 0) ? (
         <div className="absolute z-10 w-full mt-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {suggestions.map((suggestion, index) => (
-            <button
-              key={index}
-              onClick={() => handleSuggestionClick(suggestion)}
-              className="w-full text-left px-4 py-3 text-white hover:bg-white/20 transition-colors border-b border-white/10 last:border-b-0 flex items-center space-x-3"
-            >
-              <MapPin className="h-4 w-4 text-white/60 flex-shrink-0" />
-              <span className="truncate">{suggestion}</span>
-            </button>
-          ))}
+          {showSuggestions && suggestions.length > 0 && (
+            <>
+              <div className="px-4 py-2 border-b border-white/10">
+                <span className="text-xs text-white/70 font-medium">Önerilen Adresler</span>
+              </div>
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={`suggestion-${index}`}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full text-left px-4 py-3 text-white hover:bg-white/20 transition-colors border-b border-white/10 last:border-b-0 flex items-center space-x-3"
+                >
+                  <MapPin className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                  <span className="truncate">{suggestion}</span>
+                </button>
+              ))}
+            </>
+          )}
+          
+          {showPopular && popularDestinations.length > 0 && (
+            <>
+              <div className="px-4 py-2 border-b border-white/10">
+                <span className="text-xs text-white/70 font-medium">Popüler Destinasyonlar</span>
+              </div>
+              {popularDestinations.slice(0, 8).map((destination, index) => (
+                <button
+                  key={`popular-${index}`}
+                  onClick={() => handleSuggestionClick(destination)}
+                  className="w-full text-left px-4 py-3 text-white hover:bg-white/20 transition-colors border-b border-white/10 last:border-b-0 flex items-center space-x-3"
+                >
+                  <MapPin className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+                  <span className="truncate">{destination}</span>
+                </button>
+              ))}
+            </>
+          )}
           
           {/* API Status Indicator */}
           {!googleMapsLoaded && (
             <div className="px-4 py-2 border-t border-white/10">
               <div className="flex items-center space-x-2 text-xs text-white/60">
                 <AlertCircle className="h-3 w-3" />
-                <span>Google Maps API'si yüklenemedi - Statik öneriler gösteriliyor</span>
+                <span>Google Maps API yükleniyor - {suggestions.length > 0 ? 'Gerçek zamanlı' : 'Statik'} öneriler gösteriliyor</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -161,13 +211,13 @@ export default function AddressAutocomplete({
                   }}
                   className="text-blue-300 hover:text-blue-200 underline"
                 >
-                  Düzelt
+                  Detay
                 </button>
               </div>
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Enhanced Diagnostic Information */}
       {apiError && showDiagnostics && (
