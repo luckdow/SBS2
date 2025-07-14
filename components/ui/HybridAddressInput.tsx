@@ -109,7 +109,7 @@ export default function HybridAddressInput({
         setShowFallback(true);
         setShowGoogleMaps(false);
       }
-    }, 5000);
+    }, 3000); // Reduced from 5000ms to 3000ms
 
     return () => clearTimeout(timer);
   }, [showGoogleMaps, googleMapsError]);
