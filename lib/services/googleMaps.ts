@@ -1,9 +1,14 @@
 // Google Maps API Integration - Singleton Service
 export class GoogleMapsService {
   private static instance: GoogleMapsService | null = null;
-  // --- DEĞİŞİKLİK BURADA YAPILDI ---
-  // API Anahtarı artık ortam değişkeninden okunmuyor, doğrudan koda yazıldı.
-  private static apiKey = 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw';
+  // API key is now read from environment variables for consistency
+  private static get apiKey(): string {
+    if (typeof window !== 'undefined') {
+      // In browser environment, Next.js injects the env var
+      return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+    }
+    return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  }
   private static cache = new Map();
   private static cacheTimeout = 5 * 60 * 1000; // 5 minutes
   private static isInitialized = false;
