@@ -8,11 +8,7 @@ const nextConfig = {
   },
   experimental: {
     esmExternals: 'loose'
-  },
-  // BU BLOĞU EKLEYİN VEYA GÜNCELLEYİN
-  env: {
-    NEXT_PUBLIC_Maps_API_KEY: process.env.NEXT_PUBLIC_Maps_API_KEY,
-  },
+  }
 }
 
 module.exports = nextConfig
