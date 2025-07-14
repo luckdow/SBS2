@@ -13,16 +13,14 @@ import {
   Phone,
   ArrowRight,
   Car,
-  Settings,
-  CheckCircle,
   Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { AuthService } from '../../lib/services/authService';
+import { AuthService } from '../../../lib/services/authService';
 
-export default function RegisterPage() {
+export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [registerType, setRegisterType] = useState<'customer' | 'driver'>('customer');
@@ -41,7 +39,7 @@ export default function RegisterPage() {
   });
   const router = useRouter();
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (formData.password !== formData.confirmPassword) {
@@ -86,10 +84,10 @@ export default function RegisterPage() {
         await AuthService.createUserProfile(user, additionalData);
         
         toast.success('🎉 Kayıt başarılı! Giriş yapabilirsiniz.');
-        router.push('/login');
+        router.push('/auth/signin');
       }
     } catch (error: any) {
-      console.error('Register error:', error);
+      console.error('Sign-up error:', error);
       
       let errorMessage = '❌ Kayıt hatası!';
       if (error.code === 'auth/email-already-in-use') {
@@ -106,7 +104,7 @@ export default function RegisterPage() {
     }
   };
 
-  const handleGoogleRegister = async () => {
+  const handleGoogleSignUp = async () => {
     setLoading(true);
     
     try {
@@ -120,10 +118,10 @@ export default function RegisterPage() {
         });
         
         toast.success('🎉 Google ile kayıt başarılı!');
-        router.push('/login');
+        router.push('/auth/signin');
       }
     } catch (error: any) {
-      console.error('Google register error:', error);
+      console.error('Google sign-up error:', error);
       
       let errorMessage = '❌ Google kayıt hatası!';
       if (error.code === 'auth/popup-closed-by-user') {
@@ -221,11 +219,12 @@ export default function RegisterPage() {
                 <button
                   key={type.id}
                   onClick={() => setRegisterType(type.id as any)}
+                  disabled={loading}
                   className={`p-4 rounded-xl transition-all duration-300 ${
                     registerType === type.id
                       ? `bg-gradient-to-r ${type.gradient} text-white shadow-lg`
                       : 'text-white/70 hover:text-white hover:bg-white/10'
-                  }`}
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <type.icon className="h-6 w-6 mx-auto mb-2" />
                   <span className="text-sm font-medium block">{type.name}</span>
@@ -244,7 +243,7 @@ export default function RegisterPage() {
             transition={{ delay: 0.2 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-8"
           >
-            <form onSubmit={handleRegister} className="space-y-6">
+            <form onSubmit={handleSignUp} className="space-y-6">
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -253,7 +252,8 @@ export default function RegisterPage() {
                     type="text"
                     value={formData.firstName}
                     onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    disabled={loading}
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Adınız"
                     required
                   />
@@ -264,7 +264,8 @@ export default function RegisterPage() {
                     type="text"
                     value={formData.lastName}
                     onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    disabled={loading}
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Soyadınız"
                     required
                   />
@@ -280,7 +281,8 @@ export default function RegisterPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    disabled={loading}
+                    className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="ornek@email.com"
                     required
                   />
@@ -296,7 +298,8 @@ export default function RegisterPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    disabled={loading}
+                    className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="+90 532 123 4567"
                     required
                   />
@@ -312,7 +315,8 @@ export default function RegisterPage() {
                       type="text"
                       value={formData.licenseNumber}
                       onChange={(e) => setFormData({...formData, licenseNumber: e.target.value})}
-                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      disabled={loading}
+                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       placeholder="B123456789"
                       required
                     />
@@ -323,7 +327,8 @@ export default function RegisterPage() {
                       <select
                         value={formData.vehicleType}
                         onChange={(e) => setFormData({...formData, vehicleType: e.target.value})}
-                        className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                        disabled={loading}
+                        className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         required
                       >
                         <option value="">Seçiniz</option>
@@ -339,7 +344,8 @@ export default function RegisterPage() {
                         type="text"
                         value={formData.vehiclePlate}
                         onChange={(e) => setFormData({...formData, vehiclePlate: e.target.value})}
-                        className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                        disabled={loading}
+                        className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         placeholder="34 ABC 123"
                         required
                       />
@@ -357,14 +363,17 @@ export default function RegisterPage() {
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    className="w-full pl-12 pr-12 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    disabled={loading}
+                    className="w-full pl-12 pr-12 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="••••••••"
                     required
+                    minLength={6}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                    disabled={loading}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -379,14 +388,17 @@ export default function RegisterPage() {
                     type={showConfirmPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                    className="w-full pl-12 pr-12 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    disabled={loading}
+                    className="w-full pl-12 pr-12 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="••••••••"
                     required
+                    minLength={6}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                    disabled={loading}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -400,10 +412,11 @@ export default function RegisterPage() {
                   id="acceptTerms"
                   checked={formData.acceptTerms}
                   onChange={(e) => setFormData({...formData, acceptTerms: e.target.checked})}
-                  className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500"
+                  disabled={loading}
+                  className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <label htmlFor="acceptTerms" className="text-sm text-white">
-                  <Link href="/terms" className="text-blue-400 hover:text-blue-300">Kullanım şartlarını</Link> kabul ediyorum
+                  <Link href="/terms-of-service" className="text-blue-400 hover:text-blue-300">Kullanım şartlarını</Link> kabul ediyorum
                 </label>
               </div>
 
@@ -436,7 +449,7 @@ export default function RegisterPage() {
 
             {/* Google Register */}
             <button
-              onClick={handleGoogleRegister}
+              onClick={handleGoogleSignUp}
               disabled={loading}
               className="w-full bg-white/10 backdrop-blur-md border border-white/30 text-white px-6 py-4 rounded-xl hover:bg-white/20 transition-all duration-300 font-medium flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -457,7 +470,7 @@ export default function RegisterPage() {
             <div className="mt-6 text-center">
               <p className="text-white/70">
                 Zaten hesabınız var mı?{' '}
-                <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
+                <Link href="/auth/signin" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
                   Giriş Yapın
                 </Link>
               </p>

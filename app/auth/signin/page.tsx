@@ -9,7 +9,6 @@ import {
   EyeOff, 
   MapPin,
   Sparkles,
-  Shield,
   ArrowRight,
   User,
   Car,
@@ -19,9 +18,9 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { AuthService } from '../../lib/services/authService';
+import { AuthService } from '../../../lib/services/authService';
 
-export default function LoginPage() {
+export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginType, setLoginType] = useState<'customer' | 'driver' | 'admin'>('customer');
   const [loading, setLoading] = useState(false);
@@ -31,7 +30,7 @@ export default function LoginPage() {
   });
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
@@ -54,7 +53,7 @@ export default function LoginPage() {
         }
       }
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Sign-in error:', error);
       
       let errorMessage = '❌ Giriş hatası!';
       if (error.code === 'auth/user-not-found') {
@@ -73,7 +72,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignIn = async () => {
     setLoading(true);
     
     try {
@@ -95,7 +94,7 @@ export default function LoginPage() {
         }
       }
     } catch (error: any) {
-      console.error('Google login error:', error);
+      console.error('Google sign-in error:', error);
       
       let errorMessage = '❌ Google giriş hatası!';
       if (error.code === 'auth/popup-closed-by-user') {
@@ -224,7 +223,7 @@ export default function LoginPage() {
             transition={{ delay: 0.2 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-8"
           >
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={handleSignIn} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-white mb-2">E-posta</label>
                 <div className="relative">
@@ -303,7 +302,7 @@ export default function LoginPage() {
 
             {/* Google Login */}
             <button
-              onClick={handleGoogleLogin}
+              onClick={handleGoogleSignIn}
               disabled={loading}
               className="w-full bg-white/10 backdrop-blur-md border border-white/30 text-white px-6 py-4 rounded-xl hover:bg-white/20 transition-all duration-300 font-medium flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -320,21 +319,11 @@ export default function LoginPage() {
               <span>Google ile Giriş Yap</span>
             </button>
 
-            {/* Demo Accounts */}
-            <div className="mt-6 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-xl">
-              <h4 className="font-semibold text-yellow-200 mb-2">Demo Hesaplar</h4>
-              <div className="space-y-1 text-yellow-100 text-sm">
-                <p>• <strong>Admin:</strong> admin@sbstravel.com / admin123</p>
-                <p>• <strong>Şoför:</strong> sofor@sbstravel.com / sofor123</p>
-                <p>• <strong>Müşteri:</strong> musteri@sbstravel.com / musteri123</p>
-              </div>
-            </div>
-
             {/* Register Link */}
             <div className="mt-6 text-center">
               <p className="text-white/70">
                 Hesabınız yok mu?{' '}
-                <Link href="/register" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
+                <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
                   Kayıt Olun
                 </Link>
               </p>

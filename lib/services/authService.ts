@@ -7,7 +7,8 @@ import {
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -60,6 +61,15 @@ export class AuthService {
       await firebaseSignOut(auth);
     } catch (error) {
       console.error('Sign-out error:', error);
+      throw error;
+    }
+  }
+
+  static async sendPasswordReset(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error('Password reset error:', error);
       throw error;
     }
   }
