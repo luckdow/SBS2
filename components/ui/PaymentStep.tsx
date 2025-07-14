@@ -24,9 +24,10 @@ interface PaymentStepProps {
   reservationData: any;
   onNext: (paymentData: any) => void;
   onBack: () => void;
+  disabled?: boolean;
 }
 
-export default function PaymentStep({ reservationData, onNext, onBack }: PaymentStepProps) {
+export default function PaymentStep({ reservationData, onNext, onBack, disabled = false }: PaymentStepProps) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [loading, setLoading] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<any>(null);
@@ -155,6 +156,7 @@ export default function PaymentStep({ reservationData, onNext, onBack }: Payment
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >
       <div className="text-center">
@@ -462,7 +464,8 @@ export default function PaymentStep({ reservationData, onNext, onBack }: Payment
       <div className="flex justify-between pt-4">
         <button
           onClick={onBack}
-          className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2"
+          disabled={disabled}
+          className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span>Geri Dön</span>
@@ -470,7 +473,7 @@ export default function PaymentStep({ reservationData, onNext, onBack }: Payment
         
         <button
           onClick={handleProceedToPayment}
-          disabled={!selectedPaymentMethod || loading}
+          disabled={!selectedPaymentMethod || loading || disabled}
           className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-2"
         >
           {loading ? (
