@@ -155,7 +155,10 @@ export class GoogleMapsService {
   }> {
     try {
       if (!this.isConfigured()) {
-        return { status: 'error', error: 'Google Maps API key not configured' };
+        return { 
+          status: 'error', 
+          error: 'Google Maps API anahtarı yapılandırılmamış. Lütfen .env.local dosyasında NEXT_PUBLIC_GOOGLE_MAPS_API_KEY değişkenini ayarlayın.' 
+        };
       }
 
       const response = await fetch(
@@ -163,7 +166,13 @@ export class GoogleMapsService {
       );
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        if (response.status === 403) {
+          throw new Error('API anahtarı geçersiz veya domain kısıtlaması mevcut');
+        } else if (response.status === 429) {
+          throw new Error('API kullanım limitine ulaşıldı');
+        } else {
+          throw new Error(`HTTP hatası: ${response.status}`);
+        }
       }
       
       const data = await response.json();
@@ -176,17 +185,28 @@ export class GoogleMapsService {
           steps: route.legs[0].steps,
           status: 'success'
         };
+      } else if (data.status === 'ZERO_RESULTS') {
+        return { 
+          status: 'error', 
+          error: 'Bu lokasyonlar arasında rota bulunamadı' 
+        };
+      } else if (data.status === 'REQUEST_DENIED') {
+        return { 
+          status: 'error', 
+          error: 'Google Maps API erişimi reddedildi. API anahtarını kontrol edin.' 
+        };
       } else {
         return { 
           status: 'error', 
-          error: `Directions API error: ${data.status}` 
+          error: `Rota hesaplanamadı: ${data.status}` 
         };
       }
     } catch (error) {
       console.error('🗺️ Google Directions API Error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata oluştu';
       return { 
         status: 'error', 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: `Harita servisi hatası: ${errorMessage}` 
       };
     }
   }

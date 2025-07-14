@@ -128,14 +128,29 @@ export default function RouteVisualization({ origin, destination, distance, dura
           });
         } else {
           console.error('Directions request failed:', status);
-          setError(`Route bulunamadı: ${status}`);
+          let userFriendlyError = 'Rota hesaplanamadı';
+          
+          if (status === 'ZERO_RESULTS') {
+            userFriendlyError = 'Bu lokasyonlar arasında rota bulunamadı';
+          } else if (status === 'REQUEST_DENIED') {
+            userFriendlyError = 'Google Maps API erişimi reddedildi';
+          } else if (status === 'INVALID_REQUEST') {
+            userFriendlyError = 'Geçersiz rota talebi';
+          } else if (status === 'OVER_QUERY_LIMIT') {
+            userFriendlyError = 'Google Maps kullanım limitine ulaşıldı';
+          } else {
+            userFriendlyError = `Rota servisi hatası: ${status}`;
+          }
+          
+          setError(userFriendlyError);
         }
         setLoading(false);
       });
 
     } catch (err) {
       console.error('Map initialization error:', err);
-      setError('Harita yüklenirken hata oluştu');
+      const errorMessage = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      setError(`Harita başlatılamadı: ${errorMessage}`);
       setLoading(false);
     }
   };
@@ -214,10 +229,17 @@ export default function RouteVisualization({ origin, destination, distance, dura
             </div>
           ) : error ? (
             <div className="h-64 bg-white/5 rounded-xl flex items-center justify-center">
-              <div className="text-center">
-                <Route className="h-8 w-8 text-white/60 mx-auto mb-2" />
-                <p className="text-white/70 text-sm">{error}</p>
-                <p className="text-white/50 text-xs mt-1">Harita görünümü şu anda kullanılamıyor</p>
+              <div className="text-center px-4">
+                <Route className="h-8 w-8 text-white/60 mx-auto mb-3" />
+                <p className="text-white font-medium text-base mb-2">Harita Görünümü Kullanılamıyor</p>
+                <p className="text-white/70 text-sm mb-3">
+                  Google Maps entegrasyonu şu anda aktif değil, ancak mesafe ve süre bilgileri hesaplanmıştır.
+                </p>
+                <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-3 text-left">
+                  <p className="text-blue-200 text-xs">
+                    <strong>Teknik Detay:</strong> {error}
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -256,14 +278,21 @@ export default function RouteVisualization({ origin, destination, distance, dura
 
         {/* API Status Info */}
         {!GoogleMapsService.isConfigured() && (
-          <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-4">
-            <div className="flex items-center space-x-2">
-              <Route className="h-5 w-5 text-yellow-400" />
+          <div className="bg-amber-500/20 border border-amber-500/50 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <Route className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-yellow-200 font-medium text-sm">Google Maps API Yapılandırması Gerekli</p>
-                <p className="text-yellow-200/80 text-xs mt-1">
-                  Harita görünümü için Google Maps API anahtarının .env.local dosyasında yapılandırılması gerekiyor.
+                <p className="text-amber-200 font-medium text-sm mb-1">Google Maps API Yapılandırması Gerekli</p>
+                <p className="text-amber-200/80 text-xs mb-2">
+                  Gerçek zamanlı harita görünümü ve daha detaylı rota bilgileri için Google Maps API anahtarının 
+                  .env.local dosyasında NEXT_PUBLIC_GOOGLE_MAPS_API_KEY olarak yapılandırılması gerekiyor.
                 </p>
+                <div className="bg-amber-500/10 rounded-md p-2 text-xs text-amber-200/70">
+                  <p className="mb-1"><strong>Şu anda aktif:</strong></p>
+                  <p>• Mesafe ve süre tahmini ✓</p>
+                  <p>• Adres önerileri ✓</p>
+                  <p>• Temel rota bilgileri ✓</p>
+                </div>
               </div>
             </div>
           </div>
