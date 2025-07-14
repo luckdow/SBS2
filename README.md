@@ -20,9 +20,13 @@ npm install
 
 ### 2. Environment Variables Ayarla
 
-`.env.local` dosyası oluşturun ve Firebase konfigürasyonunu ekleyin:
+`.env.local` dosyası oluşturun ve gerekli konfigürasyonları ekleyin:
 
 ```env
+# Google Maps API Configuration
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+
+# Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key_here
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain_here
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id_here
@@ -30,7 +34,22 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket_here
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id_here
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id_here
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id_here
+
+# PayTR Configuration (Optional)
+NEXT_PUBLIC_PAYTR_MERCHANT_ID=your_paytr_merchant_id
+NEXT_PUBLIC_PAYTR_MERCHANT_KEY=your_paytr_merchant_key
+NEXT_PUBLIC_PAYTR_MERCHANT_SALT=your_paytr_merchant_salt
 ```
+
+#### Google Maps API Key Alma
+
+1. [Google Cloud Console](https://console.cloud.google.com/) adresine gidin
+2. Yeni bir proje oluşturun veya mevcut bir projeyi seçin
+3. **APIs & Services** → **Library** bölümüne gidin
+4. **Maps JavaScript API** ve **Places API** servislerini etkinleştirin
+5. **APIs & Services** → **Credentials** bölümüne gidin
+6. **Create Credentials** → **API Key** seçeneğini seçin
+7. Oluşturulan API anahtarını `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` değişkenine ekleyin
 
 ### 3. Development Server Başlat
 ```bash
@@ -56,11 +75,27 @@ npm run dev
 
 ## 🚀 Deployment
 
+### Vercel Deployment (Önerilen)
+
+1. **Environment Variables** ekleyin:
+   - Vercel Dashboard → Project Settings → Environment Variables
+   - Aşağıdaki değişkenleri ekleyin:
+     - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+     - Firebase değişkenleri (yukarıda belirtildiği gibi)
+     - PayTR değişkenleri (isteğe bağlı)
+
+2. **Build Settings**:
+   - Build command: `npm run build`
+   - Output directory: `.next`
+   - Node version: 18+
+
+3. **Deploy** butonuna tıklayın
+
 ### Netlify Deployment
 
 1. **Environment Variables** ekleyin:
    - Netlify Dashboard → Site Settings → Environment Variables
-   - Yukarıdaki Firebase değişkenlerini ekleyin
+   - Yukarıdaki Google Maps ve Firebase değişkenlerini ekleyin
 
 2. **Build Settings**:
    - Build command: `npm run build`
