@@ -29,13 +29,12 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
-import { GoogleMapsService } from '../../lib/services/googleMaps';
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { vehicleService, serviceService } from '../../lib/services/api';
-import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
-import RouteVisualization from '../../components/ui/RouteVisualization';
+import SimpleAddressInput from '../../components/ui/SimpleAddressInput';
+import SimpleRouteInfo from '../../components/ui/SimpleRouteInfo';
 import PaymentStep from '../../components/ui/PaymentStep';
 
 export default function ReservationPage() {
@@ -193,29 +192,73 @@ export default function ReservationPage() {
   ];
 
   const handleRouteNext = (routeData: any) => {
-    // Calculate distance using Google Maps
-    GoogleMapsService.calculateDistance(routeData.from, routeData.to)
-      .then(result => {
-        if (result.status === 'success') {
-          setReservationData(prev => ({ 
-            ...prev, 
-            ...routeData, 
-            distance: result.distance,
-            estimatedDuration: result.duration
-          }));
-        } else {
-          console.error('Distance calculation error:', result.error);
-          // Fallback with default distance
-          setReservationData(prev => ({ ...prev, ...routeData, distance: 25, estimatedDuration: '30 dakika' }));
-        }
-        setCurrentStep(2);
-      })
-      .catch(error => {
-        console.error('Distance calculation error:', error);
-        // Fallback with default distance
-        setReservationData(prev => ({ ...prev, ...routeData, distance: 25, estimatedDuration: '30 dakika' }));
-        setCurrentStep(2);
-      });
+    // Simple distance calculation based on common Antalya routes
+    const calculateDistance = (from: string, to: string) => {
+      const lowerFrom = from.toLowerCase();
+      const lowerTo = to.toLowerCase();
+      
+      let distance = 25; // Default distance
+      let duration = '30 dakika'; // Default duration
+      
+      // Airport to city center area
+      if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
+          (lowerTo.includes('lara') || lowerTo.includes('konyaaltı'))) {
+        distance = 20;
+        duration = '25 dakika';
+      }
+      // Airport to Kemer
+      else if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
+               lowerTo.includes('kemer')) {
+        distance = 45;
+        duration = '55 dakika';
+      }
+      // Airport to Side
+      else if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
+               lowerTo.includes('side')) {
+        distance = 65;
+        duration = '75 dakika';
+      }
+      // Airport to Belek
+      else if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
+               lowerTo.includes('belek')) {
+        distance = 35;
+        duration = '40 dakika';
+      }
+      // Reverse routes
+      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
+               (lowerFrom.includes('lara') || lowerFrom.includes('konyaaltı'))) {
+        distance = 20;
+        duration = '25 dakika';
+      }
+      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
+               lowerFrom.includes('kemer')) {
+        distance = 45;
+        duration = '55 dakika';
+      }
+      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
+               lowerFrom.includes('side')) {
+        distance = 65;
+        duration = '75 dakika';
+      }
+      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
+               lowerFrom.includes('belek')) {
+        distance = 35;
+        duration = '40 dakika';
+      }
+      
+      return { distance, duration };
+    };
+
+    const result = calculateDistance(routeData.from, routeData.to);
+    
+    setReservationData(prev => ({ 
+      ...prev, 
+      ...routeData, 
+      distance: result.distance,
+      estimatedDuration: result.duration
+    }));
+    
+    setCurrentStep(2);
   };
 
   const handleVehicleNext = (vehicleData: any) => {
@@ -544,19 +587,17 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
           <label className="block text-lg font-semibold text-white">
             {formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}
           </label>
-          <AddressAutocomplete
+          <SimpleAddressInput
             value={formData.hotelLocation}
             onChange={(value) => setFormData({...formData, hotelLocation: value})}
             placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'}
           />
           <div className="text-sm text-white/60 bg-white/5 rounded-lg p-3">
             <p>💡 <strong>İpucu:</strong> Otel adını yazmaya başladığınızda öneriler görünecektir.</p>
-            {!GoogleMapsService.isConfigured() && (
-              <p className="text-amber-300 text-xs mt-2 flex items-center space-x-1">
-                <span>⚡</span>
-                <span>Google Maps API configured - attempting to load real-time suggestions.</span>
-              </p>
-            )}
+            <p className="text-blue-300 text-xs mt-2 flex items-center space-x-1">
+              <span>⚡</span>
+              <span>Google Maps entegrasyonu kaldırıldı - yerel öneriler gösteriliyor.</span>
+            </p>
           </div>
         </div>
 
@@ -712,9 +753,9 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
         <p className="text-white/70 text-lg">Size uygun lüks aracı seçin (Mesafe: {distance} km{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''})</p>
       </div>
 
-      {/* Route Visualization */}
+      {/* Route Information */}
       {reservationData?.from && reservationData?.to && (
-        <RouteVisualization 
+        <SimpleRouteInfo 
           origin={reservationData.from}
           destination={reservationData.to}
           distance={distance}
