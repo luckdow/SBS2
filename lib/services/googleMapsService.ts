@@ -63,15 +63,9 @@ export class GoogleMapsService {
         requestedRegion: 'TR',
       });
       
-      // Apply component restrictions if provided
-      if (options?.componentRestrictions) {
-        autocompleteElement.componentRestrictions = options.componentRestrictions;
-      }
-      
-      // Apply type restrictions if provided
-      if (options?.types) {
-        autocompleteElement.types = options.types as any;
-      }
+      // Note: componentRestrictions and types are not supported in the modern API
+      // These features are handled internally by the element based on requestedRegion
+      // The modern API automatically restricts results based on the region
       
       // Note: PlaceAutocompleteElement doesn't support direct placeholder setting
       // The placeholder is managed internally by the element
@@ -423,16 +417,32 @@ export class GoogleMapsService {
 
       // Handle modern PlaceAutocompleteElement
       if ('remove' in autocomplete && typeof autocomplete.remove === 'function') {
-        // Check if element is still in DOM before removal
-        if (autocomplete.isConnected) {
-          autocomplete.remove();
+        // Multiple checks to ensure safe removal
+        if (autocomplete.isConnected && autocomplete.parentNode) {
+          try {
+            // Try using remove() first (modern approach)
+            autocomplete.remove();
+          } catch (removeError) {
+            // Fallback to parentNode.removeChild if remove() fails
+            try {
+              if (autocomplete.parentNode && autocomplete.parentNode.contains(autocomplete)) {
+                autocomplete.parentNode.removeChild(autocomplete);
+              }
+            } catch (parentRemoveError) {
+              console.warn('Could not remove autocomplete element via parent:', parentRemoveError);
+            }
+          }
         }
         return;
       }
 
       // Handle legacy Autocomplete
-      if (google && google.maps && google.maps.event && 'clearInstanceListeners' in google.maps.event) {
-        google.maps.event.clearInstanceListeners(autocomplete);
+      if (typeof window !== 'undefined' && window.google?.maps?.event) {
+        try {
+          window.google.maps.event.clearInstanceListeners(autocomplete);
+        } catch (clearError) {
+          console.warn('Could not clear autocomplete listeners:', clearError);
+        }
       }
     } catch (error) {
       // Log but don't throw - cleanup should be silent  
@@ -442,8 +452,18 @@ export class GoogleMapsService {
 
   // Enhanced element validation for async operations
   static async validateElementDuringAsync(element: HTMLElement, operationName: string): Promise<void> {
-    if (!this.safeElementCheck(element)) {
-      throw new Error(`${operationName}: Element became unavailable during async operation`);
+    // Multiple validation checks with small delays to handle race conditions
+    const checks = [
+      () => this.safeElementCheck(element),
+      () => new Promise(resolve => setTimeout(() => resolve(this.safeElementCheck(element)), 5)),
+      () => new Promise(resolve => setTimeout(() => resolve(this.safeElementCheck(element)), 10))
+    ];
+
+    for (let i = 0; i < checks.length; i++) {
+      const isValid = await checks[i]();
+      if (!isValid) {
+        throw new Error(`${operationName}: Element became unavailable during async operation (check ${i + 1})`);
+      }
     }
   }
 }

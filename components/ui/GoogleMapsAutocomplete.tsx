@@ -84,13 +84,34 @@ export default function GoogleMapsAutocomplete({
       if (result.type === 'modern') {
         const modernElement = result.element as google.maps.places.PlaceAutocompleteElement;
         
-        // Add to container if it's not already there
-        if (!containerRef.current.contains(modernElement)) {
-          // Clear existing content and add the modern element
-          if (inputRef.current) {
-            inputRef.current.style.display = 'none';
+        // Safely add to container if it's not already there
+        if (containerRef.current && !containerRef.current.contains(modernElement)) {
+          try {
+            // Hide the fallback input when modern element is active
+            if (inputRef.current) {
+              inputRef.current.style.display = 'none';
+            }
+            
+            // Clear existing content safely before adding new element
+            while (containerRef.current.firstChild && containerRef.current.firstChild !== inputRef.current) {
+              try {
+                const child = containerRef.current.firstChild;
+                if (child.parentNode === containerRef.current) {
+                  containerRef.current.removeChild(child);
+                }
+              } catch (removeError) {
+                console.warn('Could not remove child element:', removeError);
+                break;
+              }
+            }
+            
+            containerRef.current.appendChild(modernElement);
+          } catch (appendError) {
+            console.warn('Could not append modern autocomplete element:', appendError);
+            // Fallback to legacy if modern element can't be added
+            await GoogleMapsService.safeAutocompleteCleanup(modernElement);
+            throw new Error('Failed to add modern autocomplete element to container');
           }
-          containerRef.current.appendChild(modernElement);
         }
         
         modernElement.addEventListener('gmp-placeselect', (event: any) => {
@@ -105,6 +126,11 @@ export default function GoogleMapsAutocomplete({
       } else {
         // Legacy autocomplete
         const legacyAutocomplete = result.element as google.maps.places.Autocomplete;
+        
+        // Show the fallback input for legacy mode
+        if (inputRef.current) {
+          inputRef.current.style.display = 'block';
+        }
         
         legacyAutocomplete.addListener('place_changed', () => {
           if (!isMountedRef.current) return;

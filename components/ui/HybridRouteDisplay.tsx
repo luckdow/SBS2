@@ -35,13 +35,34 @@ export default function HybridRouteDisplay({
 
   // Cleanup function to prevent DOM manipulation errors
   const cleanup = useCallback(() => {
-    // Convert async cleanup to fire-and-forget
-    GoogleMapsService.safeMapCleanup(mapInstanceRef.current, directionsRendererRef.current).catch(error => {
-      console.warn('Map cleanup warning:', error);
-    });
-    
-    mapInstanceRef.current = null;
-    directionsRendererRef.current = null;
+    try {
+      // Safe cleanup with additional validation
+      if (directionsRendererRef.current) {
+        try {
+          if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
+            directionsRendererRef.current.setDirections({ routes: [] } as any);
+            directionsRendererRef.current.setMap(null);
+          }
+        } catch (rendererError) {
+          console.warn('DirectionsRenderer cleanup warning:', rendererError);
+        }
+        directionsRendererRef.current = null;
+      }
+
+      if (mapInstanceRef.current) {
+        try {
+          const mapDiv = mapInstanceRef.current.getDiv();
+          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv)) {
+            // Google Maps cleanup happens automatically when DOM element is removed
+          }
+        } catch (mapError) {
+          console.warn('Map cleanup warning:', mapError);
+        }
+        mapInstanceRef.current = null;
+      }
+    } catch (error) {
+      console.warn('Route cleanup warning:', error);
+    }
   }, []);
 
   useEffect(() => {

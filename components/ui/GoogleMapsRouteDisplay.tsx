@@ -83,11 +83,33 @@ export default function GoogleMapsRouteDisplay({
         abortControllerRef.current = null;
       }
 
-      // Safe cleanup of Google Maps components
-      await GoogleMapsService.safeMapCleanup(mapInstanceRef.current, directionsRendererRef.current);
-      
-      mapInstanceRef.current = null;
-      directionsRendererRef.current = null;
+      // Safe cleanup of Google Maps components with additional DOM checks
+      if (directionsRendererRef.current) {
+        try {
+          // Only manipulate if map container still exists
+          if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
+            directionsRendererRef.current.setDirections({ routes: [] } as any);
+            directionsRendererRef.current.setMap(null);
+          }
+        } catch (rendererError) {
+          console.warn('DirectionsRenderer cleanup warning:', rendererError);
+        }
+        directionsRendererRef.current = null;
+      }
+
+      if (mapInstanceRef.current) {
+        try {
+          // Validate map container before cleanup
+          const mapDiv = mapInstanceRef.current.getDiv();
+          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv)) {
+            // Google Maps cleanup happens automatically when DOM element is removed
+            // We just need to clear our reference
+          }
+        } catch (mapError) {
+          console.warn('Map cleanup warning:', mapError);
+        }
+        mapInstanceRef.current = null;
+      }
     } catch (error) {
       // Silent cleanup - don't propagate errors
       console.warn('Route display cleanup warning:', error);
