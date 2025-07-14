@@ -35,6 +35,7 @@ import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { vehicleService, serviceService } from '../../lib/services/api';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
 import RouteVisualization from '../../components/ui/RouteVisualization';
+import PaymentStep from '../../components/ui/PaymentStep';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -45,7 +46,7 @@ export default function ReservationPage() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
 
-  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Onay'];
+  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme', 'Onay'];
 
   // Load vehicles and services when component mounts
   React.useEffect(() => {
@@ -224,9 +225,17 @@ export default function ReservationPage() {
     setCurrentStep(3);
   };
 
-  const handleCustomerNext = async (customerData: any) => {
+  const handleCustomerNext = (customerData: any) => {
+    setReservationData(prev => ({ 
+      ...prev, 
+      ...customerData 
+    }));
+    setCurrentStep(4);
+  };
+
+  const handlePaymentNext = async (paymentData: any) => {
     try {
-      const finalData = { ...reservationData, ...customerData };
+      const finalData = { ...reservationData, ...paymentData };
       
       // Generate QR code with reservation data
       const reservationId = `RES${Date.now()}`;
@@ -238,12 +247,12 @@ export default function ReservationPage() {
         status: 'pending' as const,
         qrCode: reservationId,
         customerId: `customer_${Date.now()}`,
-        firstName: customerData.firstName,
-        lastName: customerData.lastName,
-        email: customerData.email,
-        phone: customerData.phone,
-        flightNumber: customerData.flightNumber || '',
-        specialRequests: customerData.specialRequests || ''
+        firstName: reservationData.firstName,
+        lastName: reservationData.lastName,
+        email: reservationData.email,
+        phone: reservationData.phone,
+        flightNumber: reservationData.flightNumber || '',
+        specialRequests: reservationData.specialRequests || ''
       };
       
       console.log('🚀 Creating reservation:', reservationForFirebase);
@@ -257,26 +266,26 @@ export default function ReservationPage() {
       // Create user account automatically
       try {
         console.log('Creating customer account automatically...');
-        const fullName = `${customerData.firstName} ${customerData.lastName}`;
+        const fullName = `${reservationData.firstName} ${reservationData.lastName}`;
         
         const accountResult = await AuthService.createAutoAccount(
-          customerData.email,
+          reservationData.email,
           fullName,
-          customerData.phone
+          reservationData.phone
         );
         
         if (accountResult) {
           console.log('✅ User account created automatically');
           // Store account info for display in confirmation step
           finalReservationData.autoAccount = {
-            email: customerData.email,
+            email: reservationData.email,
             password: accountResult.password,
             created: true
           };
         } else {
           console.log('ℹ️ User account already exists or creation skipped');
           finalReservationData.autoAccount = {
-            email: customerData.email,
+            email: reservationData.email,
             created: false,
             message: 'Hesap zaten mevcut'
           };
@@ -284,7 +293,7 @@ export default function ReservationPage() {
       } catch (error) {
         console.log('⚠️ Customer account creation failed, continuing with reservation:', error);
         finalReservationData.autoAccount = {
-          email: customerData.email,
+          email: reservationData.email,
           created: false,
           error: 'Hesap oluşturulamadı'
         };
@@ -296,7 +305,7 @@ export default function ReservationPage() {
       setQrCode(qrCodeUrl);
       setReservationData(finalReservationData);
       
-      setCurrentStep(4);
+      setCurrentStep(5);
       
       toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu ve admin paneline gönderildi!');
     } catch (error) {
@@ -366,7 +375,7 @@ export default function ReservationPage() {
             {/* Step Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
-                {Array.from({ length: 4 }, (_, index) => (
+                {Array.from({ length: 5 }, (_, index) => (
                   <React.Fragment key={index}>
                     <div className="flex flex-col items-center">
                       <motion.div
@@ -395,7 +404,7 @@ export default function ReservationPage() {
                         {stepNames[index]}
                       </span>
                     </div>
-                    {index < 3 && (
+                    {index < 4 && (
                       <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: '0%' }}
@@ -415,7 +424,8 @@ export default function ReservationPage() {
               {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
               {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
               {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-              {currentStep === 4 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
+              {currentStep === 4 && <PaymentStep key="payment" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
+              {currentStep === 5 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
           </div>
         </div>
@@ -1090,9 +1100,9 @@ function CustomerInfoStep({ onNext, onBack }: any) {
           </button>
           <button
             type="submit"
-            className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+            className="group relative px-8 py-4 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
           >
-            <span>Rezervasyonu Tamamla</span>
+            <span>Ödeme Sayfasına Geç</span>
             <CheckCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
             <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
           </button>
