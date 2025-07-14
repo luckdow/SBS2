@@ -7,10 +7,10 @@ export class GoogleMapsService {
     if (typeof window !== 'undefined') {
       // Browser environment - check both window and process
       return window.process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 
-             process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+             process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw";
     }
     // Server environment
-    return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+    return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw";
   }
   
   private static cache = new Map();
