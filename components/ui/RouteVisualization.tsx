@@ -3,12 +3,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { MapPin, Navigation, Clock, Route } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
+import { loadGoogleMapsAPI } from '../../lib/googleMapsLoader';
 
 // Declare Google Maps types for TypeScript
 declare global {
   interface Window {
     google: any;
-    initMap: () => void;
   }
 }
 
@@ -29,38 +29,19 @@ export default function RouteVisualization({ origin, destination, distance, dura
   const directionsService = useRef<any>(null);
   const directionsRenderer = useRef<any>(null);
 
-  // Load Google Maps JavaScript API
+  // Load Google Maps JavaScript API using centralized loader
   useEffect(() => {
-    const loadGoogleMaps = () => {
-      if (window.google) {
+    const initializeGoogleMaps = async () => {
+      try {
+        await loadGoogleMapsAPI();
         setGoogleMapsLoaded(true);
-        return;
+      } catch (error) {
+        console.error('Failed to load Google Maps API:', error);
+        setError('Google Maps API yüklenemedi');
       }
-
-      const script = document.createElement('script');
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-      
-      if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
-        setError('Google Maps API key not configured');
-        return;
-      }
-
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
-      script.async = true;
-      script.defer = true;
-
-      window.initMap = () => {
-        setGoogleMapsLoaded(true);
-      };
-
-      script.onerror = () => {
-        setError('Google Maps API failed to load');
-      };
-
-      document.head.appendChild(script);
     };
 
-    loadGoogleMaps();
+    initializeGoogleMaps();
   }, []);
 
   // Initialize map when Google Maps is loaded and refs are ready
