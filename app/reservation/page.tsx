@@ -33,8 +33,8 @@ import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { vehicleService, serviceService } from '../../lib/services/api';
-import SimpleAddressInput from '../../components/ui/SimpleAddressInput';
-import SimpleRouteInfo from '../../components/ui/SimpleRouteInfo';
+import HybridAddressInput from '../../components/ui/HybridAddressInput';
+import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import PaymentStep from '../../components/ui/PaymentStep';
 
 export default function ReservationPage() {
@@ -192,70 +192,9 @@ export default function ReservationPage() {
   ];
 
   const handleRouteNext = (routeData: any) => {
-    // Simple distance calculation based on common Antalya routes
-    const calculateDistance = (from: string, to: string) => {
-      const lowerFrom = from.toLowerCase();
-      const lowerTo = to.toLowerCase();
-      
-      let distance = 25; // Default distance
-      let duration = '30 dakika'; // Default duration
-      
-      // Airport to city center area
-      if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
-          (lowerTo.includes('lara') || lowerTo.includes('konyaaltı'))) {
-        distance = 20;
-        duration = '25 dakika';
-      }
-      // Airport to Kemer
-      else if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
-               lowerTo.includes('kemer')) {
-        distance = 45;
-        duration = '55 dakika';
-      }
-      // Airport to Side
-      else if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
-               lowerTo.includes('side')) {
-        distance = 65;
-        duration = '75 dakika';
-      }
-      // Airport to Belek
-      else if ((lowerFrom.includes('havalimanı') || lowerFrom.includes('airport')) && 
-               lowerTo.includes('belek')) {
-        distance = 35;
-        duration = '40 dakika';
-      }
-      // Reverse routes
-      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
-               (lowerFrom.includes('lara') || lowerFrom.includes('konyaaltı'))) {
-        distance = 20;
-        duration = '25 dakika';
-      }
-      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
-               lowerFrom.includes('kemer')) {
-        distance = 45;
-        duration = '55 dakika';
-      }
-      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
-               lowerFrom.includes('side')) {
-        distance = 65;
-        duration = '75 dakika';
-      }
-      else if ((lowerTo.includes('havalimanı') || lowerTo.includes('airport')) && 
-               lowerFrom.includes('belek')) {
-        distance = 35;
-        duration = '40 dakika';
-      }
-      
-      return { distance, duration };
-    };
-
-    const result = calculateDistance(routeData.from, routeData.to);
-    
     setReservationData(prev => ({ 
       ...prev, 
-      ...routeData, 
-      distance: result.distance,
-      estimatedDuration: result.duration
+      ...routeData
     }));
     
     setCurrentStep(2);
@@ -490,17 +429,50 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
     baggage: 1,
   });
 
+  const [hotelPlace, setHotelPlace] = useState<google.maps.places.PlaceResult | undefined>();
+  const [routeData, setRouteData] = useState<{
+    distance: number;
+    duration: number;
+    distanceText: string;
+    durationText: string;
+  } | null>(null);
+
+  const getFromLocation = () => {
+    return formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
+  };
+
+  const getToLocation = () => {
+    return formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı';
+  };
+
+  const handleHotelLocationChange = (value: string, place?: google.maps.places.PlaceResult) => {
+    setFormData({ ...formData, hotelLocation: value });
+    setHotelPlace(place);
+  };
+
+  const handleRouteCalculated = (result: {
+    distance: number;
+    duration: number;
+    distanceText: string;
+    durationText: string;
+  }) => {
+    setRouteData(result);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Set from/to based on direction and hotel location
-    const routeData = {
+    const submitData = {
       ...formData,
-      from: formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation,
-      to: formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı'
+      from: getFromLocation(),
+      to: getToLocation(),
+      distance: routeData?.distance || 25, // Use Google Maps distance or fallback
+      estimatedDuration: routeData?.durationText || '30 dakika',
+      hotelPlace: hotelPlace
     };
     
-    onNext(routeData);
+    onNext(submitData);
   };
 
   return (
@@ -587,19 +559,25 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
           <label className="block text-lg font-semibold text-white">
             {formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}
           </label>
-          <SimpleAddressInput
+          <HybridAddressInput
             value={formData.hotelLocation}
-            onChange={(value) => setFormData({...formData, hotelLocation: value})}
+            onChange={handleHotelLocationChange}
             placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'}
           />
-          <div className="text-sm text-white/60 bg-white/5 rounded-lg p-3">
-            <p>💡 <strong>İpucu:</strong> Otel adını yazmaya başladığınızda öneriler görünecektir.</p>
-            <p className="text-blue-300 text-xs mt-2 flex items-center space-x-1">
-              <span>⚡</span>
-              <span>Google Maps entegrasyonu kaldırıldı - yerel öneriler gösteriliyor.</span>
-            </p>
-          </div>
         </div>
+
+        {/* Google Maps Route Display */}
+        {formData.hotelLocation && (
+          <div className="space-y-4">
+            <HybridRouteDisplay
+              origin={getFromLocation()}
+              destination={getToLocation()}
+              originPlace={formData.direction === 'hotel-to-airport' ? hotelPlace : undefined}
+              destinationPlace={formData.direction === 'airport-to-hotel' ? hotelPlace : undefined}
+              onRouteCalculated={handleRouteCalculated}
+            />
+          </div>
+        )}
 
         {/* Date and Time */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -755,11 +733,11 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
 
       {/* Route Information */}
       {reservationData?.from && reservationData?.to && (
-        <SimpleRouteInfo 
+        <HybridRouteDisplay 
           origin={reservationData.from}
           destination={reservationData.to}
-          distance={distance}
-          duration={reservationData.estimatedDuration}
+          originPlace={reservationData.direction === 'hotel-to-airport' ? reservationData.hotelPlace : undefined}
+          destinationPlace={reservationData.direction === 'airport-to-hotel' ? reservationData.hotelPlace : undefined}
         />
       )}
 
