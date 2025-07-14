@@ -421,11 +421,11 @@ export default function ReservationPage() {
 
             {/* Step Content */}
             <AnimatePresence mode="wait">
-              {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
-              {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
-              {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-              {currentStep === 4 && <PaymentStep key="payment" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
-              {currentStep === 5 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
+              {currentStep === 1 && <RouteStep key="route-step" onNext={handleRouteNext} />}
+              {currentStep === 2 && <VehicleStep key="vehicle-step" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
+              {currentStep === 3 && <CustomerInfoStep key="customer-step" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
+              {currentStep === 4 && <PaymentStep key="payment-step" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
+              {currentStep === 5 && <ConfirmationStep key="confirmation-step" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
           </div>
         </div>
@@ -804,7 +804,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {filteredVehicles.map((vehicle: any) => (
             <motion.div
-              key={vehicle.id}
+              key={`vehicle-${vehicle.id}`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedVehicle(vehicle.id)}
@@ -892,7 +892,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {services.map((service: any) => (
               <motion.div
-                key={service.id}
+                key={`service-${service.id}`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleServiceToggle(service.id)}

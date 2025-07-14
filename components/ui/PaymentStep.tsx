@@ -251,7 +251,7 @@ export default function PaymentStep({ reservationData, onNext, onBack }: Payment
             <div className="space-y-4">
               {getAvailablePaymentMethods().map((method) => (
                 <motion.div
-                  key={method.id}
+                  key={`payment-${method.id}`}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handlePaymentSelect(method.id)}

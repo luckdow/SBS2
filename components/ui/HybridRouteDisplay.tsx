@@ -29,6 +29,7 @@ export default function HybridRouteDisplay({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const isMountedRef = useRef(true); // Track component mount state
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
@@ -36,15 +37,25 @@ export default function HybridRouteDisplay({
   // Cleanup function to prevent DOM manipulation errors
   const cleanup = useCallback(() => {
     try {
-      // Safe cleanup with additional validation
+      // Enhanced safety checks with additional validation
       if (directionsRendererRef.current) {
         try {
+          // Check if map container is still valid before cleanup
           if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
-            directionsRendererRef.current.setDirections({ routes: [] } as any);
-            directionsRendererRef.current.setMap(null);
+            const mapDiv = mapInstanceRef.current.getDiv();
+            // Additional check: ensure map div is still connected and our ref matches
+            if (GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
+              // Only attempt cleanup if all elements are still properly connected
+              directionsRendererRef.current.setDirections({ routes: [] } as any);
+              directionsRendererRef.current.setMap(null);
+            } else {
+              console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
+            }
+          } else {
+            console.warn('Map instance or container unavailable during cleanup - skipping DirectionsRenderer cleanup');
           }
         } catch (rendererError) {
-          console.warn('DirectionsRenderer cleanup warning:', rendererError);
+          console.warn('DirectionsRenderer cleanup warning (non-critical):', rendererError);
         }
         directionsRendererRef.current = null;
       }
@@ -52,21 +63,35 @@ export default function HybridRouteDisplay({
       if (mapInstanceRef.current) {
         try {
           const mapDiv = mapInstanceRef.current.getDiv();
-          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv)) {
+          // Only validate if the map container matches our reference and is still connected
+          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
             // Google Maps cleanup happens automatically when DOM element is removed
+            // Just clear our reference to prevent memory leaks
+          } else {
+            console.warn('Map div unavailable or mismatched during cleanup');
           }
         } catch (mapError) {
-          console.warn('Map cleanup warning:', mapError);
+          console.warn('Map cleanup warning (non-critical):', mapError);
         }
         mapInstanceRef.current = null;
       }
     } catch (error) {
-      console.warn('Route cleanup warning:', error);
+      console.warn('Route cleanup warning (non-critical):', error);
     }
   }, []);
 
+  // Enhanced cleanup on unmount with abort controller for pending operations
   useEffect(() => {
-    return cleanup; // Cleanup on unmount
+    const abortController = new AbortController();
+    
+    return () => {
+      // Mark component as unmounted to prevent further DOM operations
+      isMountedRef.current = false;
+      // Signal any pending operations to abort
+      abortController.abort();
+      // Clean up Google Maps elements
+      cleanup();
+    };
   }, [cleanup]);
 
   useEffect(() => {
@@ -125,9 +150,17 @@ export default function HybridRouteDisplay({
           destinationPlace?.geometry?.location || destination
         );
         
-        // Final check before setting directions
-        if (directionsRenderer && GoogleMapsService.safeElementCheck(mapRef.current)) {
+        // Final safety check before setting directions - validate all elements still exist
+        if (directionsRenderer && 
+            mapRef.current && 
+            GoogleMapsService.safeElementCheck(mapRef.current) &&
+            mapInstanceRef.current &&
+            directionsRendererRef.current === directionsRenderer &&
+            isMountedRef.current) { // Check component is still mounted
           directionsRenderer.setDirections(result);
+        } else {
+          console.warn('Component unmounted or invalid during route calculation - skipping direction display');
+          return;
         }
 
         // Bilgileri ayarla ve state'i güncelle
@@ -139,17 +172,27 @@ export default function HybridRouteDisplay({
           durationText: leg.duration?.text || '',
         };
 
-        setRouteInfo({ distanceText: routeData.distanceText, durationText: routeData.durationText });
-        onRouteCalculated?.(routeData);
-        setStatus('success');
+        // Final check before updating state - ensure component is still mounted
+        if (mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current) && isMountedRef.current) {
+          setRouteInfo({ distanceText: routeData.distanceText, durationText: routeData.durationText });
+          onRouteCalculated?.(routeData);
+          setStatus('success');
+        } else {
+          console.warn('Component unmounted during route processing - skipping state update');
+        }
 
       } catch (error) {
-        const msg = error instanceof Error
-          ? `Rota hesaplanamadı: ${error.message}`
-          : 'Bilinmeyen bir harita hatası oluştu.';
-        setErrorMessage(msg);
-        setStatus('error');
-        console.error('Google Maps Route Error:', msg);
+        // Only set error state if component is still mounted
+        if (mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current) && isMountedRef.current) {
+          const msg = error instanceof Error
+            ? `Rota hesaplanamadı: ${error.message}`
+            : 'Bilinmeyen bir harita hatası oluştu.';
+          setErrorMessage(msg);
+          setStatus('error');
+          console.error('Google Maps Route Error:', msg);
+        } else {
+          console.warn('Component unmounted during error handling - skipping error display');
+        }
       }
     };
 

@@ -391,18 +391,40 @@ export class GoogleMapsService {
   static async safeMapCleanup(map: google.maps.Map | null, directionsRenderer?: google.maps.DirectionsRenderer | null): Promise<void> {
     try {
       if (directionsRenderer) {
-        // Safely clear directions
-        directionsRenderer.setDirections({ routes: [] } as any);
-        directionsRenderer.setMap(null);
+        try {
+          // Multiple safety checks before DirectionsRenderer cleanup
+          const mapInstance = directionsRenderer.getMap();
+          if (mapInstance) {
+            const mapDiv = mapInstance.getDiv();
+            // Only proceed if map container still exists and is connected
+            if (this.safeElementCheck(mapDiv)) {
+              // Clear directions first (safer than direct DOM manipulation)
+              directionsRenderer.setDirections({ routes: [] } as any);
+              // Only set map to null if container is still valid
+              directionsRenderer.setMap(null);
+            } else {
+              // Map container is gone, just clear the reference
+              console.warn('Map container unavailable during DirectionsRenderer cleanup - clearing reference only');
+            }
+          }
+        } catch (rendererError) {
+          // DirectionsRenderer cleanup failed - this is non-critical
+          console.warn('DirectionsRenderer cleanup failed (non-critical):', rendererError);
+        }
       }
       
       if (map) {
-        // Clear map without causing DOM errors
-        const mapDiv = map.getDiv();
-        if (this.safeElementCheck(mapDiv)) {
-          // Google Maps doesn't have a setMap method on the Map object
-          // The cleanup happens automatically when the DOM element is removed
-          // We just need to clear references
+        try {
+          // Clear map without causing DOM errors
+          const mapDiv = map.getDiv();
+          if (this.safeElementCheck(mapDiv)) {
+            // Google Maps cleanup happens automatically when DOM element is removed
+            // We just need to clear references and ensure no pending operations
+          } else {
+            console.warn('Map container unavailable during cleanup - DOM already removed');
+          }
+        } catch (mapError) {
+          console.warn('Map cleanup warning (non-critical):', mapError);
         }
       }
     } catch (error) {
