@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { MapPin, Navigation, Clock, Route } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
 import { loadGoogleMapsAPI } from '../../lib/googleMapsLoader';
+import GoogleMapsDiagnostics from './GoogleMapsDiagnostics';
 
 // Declare Google Maps types for TypeScript
 declare global {
@@ -24,6 +25,7 @@ export default function RouteVisualization({ origin, destination, distance, dura
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const directionsService = useRef<any>(null);
@@ -283,19 +285,49 @@ export default function RouteVisualization({ origin, destination, distance, dura
               <Route className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-amber-200 font-medium text-sm mb-1">Google Maps API Yapılandırması Gerekli</p>
-                <p className="text-amber-200/80 text-xs mb-2">
+                <p className="text-amber-200/80 text-xs mb-3">
                   Gerçek zamanlı harita görünümü ve daha detaylı rota bilgileri için Google Maps API anahtarının 
                   .env.local dosyasında NEXT_PUBLIC_GOOGLE_MAPS_API_KEY olarak yapılandırılması gerekiyor.
                 </p>
-                <div className="bg-amber-500/10 rounded-md p-2 text-xs text-amber-200/70">
-                  <p className="mb-1"><strong>Şu anda aktif:</strong></p>
+                <div className="bg-amber-500/10 rounded-md p-3 text-xs text-amber-200/70 mb-3">
+                  <p className="mb-2"><strong>Şu anda aktif:</strong></p>
                   <p>• Mesafe ve süre tahmini ✓</p>
                   <p>• Adres önerileri ✓</p>
                   <p>• Temel rota bilgileri ✓</p>
                 </div>
+                <button
+                  onClick={() => setShowDiagnostics(!showDiagnostics)}
+                  className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 px-3 py-1 rounded-lg text-amber-200 text-xs transition-colors"
+                >
+                  {showDiagnostics ? 'Tanılama Bilgilerini Gizle' : 'Detaylı Tanılama Bilgilerini Göster'}
+                </button>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Enhanced Diagnostic Information */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <Route className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-red-200 font-medium text-sm mb-1">Google Maps API Hatası</p>
+                <p className="text-red-200/80 text-xs mb-3">{error}</p>
+                <button
+                  onClick={() => setShowDiagnostics(!showDiagnostics)}
+                  className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 px-3 py-1 rounded-lg text-red-200 text-xs transition-colors"
+                >
+                  {showDiagnostics ? 'Tanılama Bilgilerini Gizle' : 'Hata Giderme Rehberini Göster'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Diagnostic Component */}
+        {showDiagnostics && (
+          <GoogleMapsDiagnostics onClose={() => setShowDiagnostics(false)} />
         )}
       </div>
     </div>
