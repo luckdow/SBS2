@@ -254,17 +254,40 @@ export default function ReservationPage() {
       
       const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
       
-      // Create user account automatically (optional, skip if fails)
+      // Create user account automatically
       try {
-        console.log('Creating customer profile...');
-        const customerProfile = {
-          email: customerData.email,
-          name: `${customerData.firstName} ${customerData.lastName}`,
-          phone: customerData.phone
-        };
-        console.log('Customer profile would be created:', customerProfile);
+        console.log('Creating customer account automatically...');
+        const fullName = `${customerData.firstName} ${customerData.lastName}`;
+        
+        const accountResult = await AuthService.createAutoAccount(
+          customerData.email,
+          fullName,
+          customerData.phone
+        );
+        
+        if (accountResult) {
+          console.log('✅ User account created automatically');
+          // Store account info for display in confirmation step
+          finalReservationData.autoAccount = {
+            email: customerData.email,
+            password: accountResult.password,
+            created: true
+          };
+        } else {
+          console.log('ℹ️ User account already exists or creation skipped');
+          finalReservationData.autoAccount = {
+            email: customerData.email,
+            created: false,
+            message: 'Hesap zaten mevcut'
+          };
+        }
       } catch (error) {
-        console.log('Customer profile creation skipped:', error);
+        console.log('⚠️ Customer account creation failed, continuing with reservation:', error);
+        finalReservationData.autoAccount = {
+          email: customerData.email,
+          created: false,
+          error: 'Hesap oluşturulamadı'
+        };
       }
       
       // Send confirmation email
@@ -1105,6 +1128,83 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
         <p className="text-white/70 text-lg">Rezervasyon bilgileriniz e-posta adresinize gönderildi.</p>
       </div>
 
+      {/* Account Creation Success */}
+      {reservationData.autoAccount && (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className={`backdrop-blur-md border-2 rounded-3xl p-8 text-center ${
+            reservationData.autoAccount.created
+              ? 'bg-gradient-to-br from-green-500/20 to-blue-500/20 border-green-500/50'
+              : 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-yellow-500/50'
+          }`}
+        >
+          <div className="flex items-center space-x-4 mb-6 justify-center">
+            <div className={`p-3 rounded-xl ${
+              reservationData.autoAccount.created ? 'bg-green-500' : 'bg-yellow-500'
+            }`}>
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-2xl font-bold text-white">
+                {reservationData.autoAccount.created ? 'Hesabınız Oluşturuldu!' : 'Hesap Bilgisi'}
+              </h3>
+              <p className={`${
+                reservationData.autoAccount.created ? 'text-green-200' : 'text-yellow-200'
+              }`}>
+                {reservationData.autoAccount.created 
+                  ? 'Otomatik olarak size özel hesap oluşturduk'
+                  : reservationData.autoAccount.message || 'Hesap durumu'
+                }
+              </p>
+            </div>
+          </div>
+          
+          {reservationData.autoAccount.created && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white/10 rounded-xl p-4">
+                <p className="text-white/70 text-sm mb-1">E-posta</p>
+                <p className="text-white font-bold">{reservationData.autoAccount.email}</p>
+              </div>
+              <div className="bg-white/10 rounded-xl p-4">
+                <p className="text-white/70 text-sm mb-1">Geçici Şifre</p>
+                <p className="text-white font-bold font-mono text-sm bg-black/30 rounded px-2 py-1">
+                  {reservationData.autoAccount.password}
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Gelecek rezervasyonlarınızda hızlı giriş</span>
+            </div>
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Özel müşteri indirimleri</span>
+            </div>
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Rezervasyon geçmişi takibi</span>
+            </div>
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Sadakat puanları</span>
+            </div>
+          </div>
+          
+          {reservationData.autoAccount.created && (
+            <div className="mt-4 bg-blue-500/20 border border-blue-500/50 rounded-xl p-3">
+              <p className="text-blue-200 text-sm">
+                💡 <strong>Önemli:</strong> Bu şifreyi not alın ve ilk girişinizde değiştirin
+              </p>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* QR Code Card */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -1267,11 +1367,32 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
             <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
             Ana Sayfaya Dön
           </Link>
-          <Link href="/customer" className="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium text-lg rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all">
-            <Users className="h-5 w-5 mr-2" />
-            Müşteri Hesabıma Dön
-          </Link>
+          {reservationData.autoAccount?.created ? (
+            <Link href="/login" className="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-medium text-lg rounded-xl hover:from-green-600 hover:to-blue-700 transition-all shadow-lg">
+              <Users className="h-5 w-5 mr-2" />
+              Hesabıma Giriş Yap
+              <Sparkles className="h-4 w-4 ml-2 animate-pulse" />
+            </Link>
+          ) : (
+            <Link href="/customer" className="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium text-lg rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all">
+              <Users className="h-5 w-5 mr-2" />
+              Müşteri Paneli
+            </Link>
+          )}
         </div>
+        
+        {reservationData.autoAccount?.created && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-4 text-center"
+          >
+            <p className="text-white/60 text-sm">
+              Hesabınıza giriş yapmak için e-posta adresinizi ve yukarıdaki geçici şifreyi kullanın
+            </p>
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );

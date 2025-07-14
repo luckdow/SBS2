@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Car,
   Star,
-  Navigation
+  Navigation,
+  Plane
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -190,6 +191,22 @@ export default function AdminReservationsPage() {
             <Clock className="h-4 w-4 text-white/60" />
             <span>{item.time}</span>
           </div>
+        </div>
+      )
+    },
+    {
+      key: 'flightNumber',
+      title: 'Uçuş No',
+      render: (value: string, item: Reservation) => (
+        <div className="text-sm text-white">
+          {item.flightNumber ? (
+            <div className="flex items-center space-x-1">
+              <Plane className="h-4 w-4 text-blue-400" />
+              <span className="font-medium">{item.flightNumber}</span>
+            </div>
+          ) : (
+            <span className="text-white/50">-</span>
+          )}
         </div>
       )
     },
@@ -459,6 +476,15 @@ export default function AdminReservationsPage() {
                         <p className="text-white/70">{selectedReservation.customer?.email || 'N/A'}</p>
                       </div>
                     </div>
+                    {selectedReservation.flightNumber && (
+                      <div className="flex items-center space-x-3">
+                        <Plane className="h-5 w-5 text-blue-400" />
+                        <div>
+                          <p className="text-white font-medium">Uçuş Numarası</p>
+                          <p className="text-white/70">{selectedReservation.flightNumber}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
