@@ -32,17 +32,94 @@ import { GoogleMapsService } from '../../lib/services/googleMaps';
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
+import { vehicleService, serviceService } from '../../lib/services/api';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
+import RouteVisualization from '../../components/ui/RouteVisualization';
+import PaymentStep from '../../components/ui/PaymentStep';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [reservationData, setReservationData] = useState<any>({});
   const [qrCode, setQrCode] = useState('');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(false);
 
-  const stepNames = ['Rota & Detay', 'Araç & Fiyat', 'Bilgiler', 'Onay'];
+  const stepNames = ['Rota & Detay', 'Araç & Fiyat', 'Bilgiler', 'Ödeme', 'Onay'];
 
-  // Mock vehicles data
-  const vehicles = [
+  // Load vehicles and services when component mounts
+  React.useEffect(() => {
+    loadVehiclesAndServices();
+  }, []);
+
+  const loadVehiclesAndServices = async () => {
+    setLoadingVehicles(true);
+    setLoadingServices(true);
+    
+    try {
+      // Load vehicles from admin panel
+      const vehiclesData = await vehicleService.getAll();
+      const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
+      setVehicles(activeVehicles.map(vehicle => ({
+        ...vehicle,
+        gradient: getVehicleGradient(vehicle.type || 'sedan')
+      })));
+    } catch (error) {
+      console.error('Error loading vehicles:', error);
+      // Fallback to mock data
+      setVehicles(mockVehicles);
+    } finally {
+      setLoadingVehicles(false);
+    }
+
+    try {
+      // Load services from admin panel
+      const servicesData = await serviceService.getAll();
+      const activeServices = servicesData.filter(service => service.isActive !== false);
+      setServices(activeServices.map(service => ({
+        ...service,
+        icon: getServiceIcon(service.category || 'extra'),
+        gradient: getServiceGradient(service.category || 'extra')
+      })));
+    } catch (error) {
+      console.error('Error loading services:', error);
+      // Fallback to mock data
+      setServices(mockServices);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
+  const getVehicleGradient = (type: string) => {
+    switch (type) {
+      case 'sedan': return 'from-blue-400 to-blue-600';
+      case 'suv': return 'from-purple-400 to-purple-600';
+      case 'van': return 'from-yellow-400 to-orange-500';
+      default: return 'from-gray-400 to-gray-600';
+    }
+  };
+
+  const getServiceIcon = (category: string) => {
+    switch (category) {
+      case 'child_seat': return Gift;
+      case 'extra_baggage': return Luggage;
+      case 'meet_greet': return Plane;
+      default: return Users;
+    }
+  };
+
+  const getServiceGradient = (category: string) => {
+    switch (category) {
+      case 'child_seat': return 'from-pink-400 to-pink-600';
+      case 'extra_baggage': return 'from-blue-400 to-blue-600';
+      case 'meet_greet': return 'from-purple-400 to-purple-600';
+      default: return 'from-green-400 to-green-600';
+    }
+  };
+
+  // Mock vehicles data (fallback)
+  const mockVehicles = [
     {
       id: '1',
       name: 'Ekonomi Sedan',
@@ -78,7 +155,8 @@ export default function ReservationPage() {
     }
   ];
 
-  const services = [
+  // Mock services data (fallback)
+  const mockServices = [
     { 
       id: '1', 
       name: 'Bebek Koltuğu', 
@@ -147,7 +225,73 @@ export default function ReservationPage() {
     setCurrentStep(3);
   };
 
-  const handleCustomerNext = async (customerData: any) => {
+  const handleCustomerNext = (customerData: any) => {
+    setReservationData(prev => ({ 
+      ...prev, 
+      ...customerData 
+    }));
+    setCurrentStep(4);
+  };
+
+  const handlePaymentNext = async (paymentData: any) => {
+    try {
+      const finalData = { ...reservationData, ...paymentData };
+      
+      // Generate QR code with reservation data
+      const reservationId = `RES${Date.now()}`;
+      const reservationWithId = { ...finalData, id: reservationId };
+      
+      // Create reservation with real-time service
+      const reservationForFirebase = {
+        ...reservationWithId,
+        status: 'pending' as const,
+        qrCode: reservationId,
+        customerId: `customer_${Date.now()}`,
+        firstName: finalData.firstName,
+        lastName: finalData.lastName,
+        email: finalData.email,
+        phone: finalData.phone,
+        flightNumber: finalData.flightNumber || '',
+        specialRequests: finalData.specialRequests || ''
+      };
+      
+      console.log('🚀 Creating reservation:', reservationForFirebase);
+      const actualReservationId = await realTimeReservationService.create(reservationForFirebase);
+      
+      // Update with actual Firebase ID
+      const finalReservationData = { ...reservationWithId, id: actualReservationId };
+      
+      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
+      
+      // Create user account automatically (optional, skip if fails)
+      try {
+        console.log('Creating customer profile...');
+        const customerProfile = {
+          email: finalData.email,
+          name: `${finalData.firstName} ${finalData.lastName}`,
+          phone: finalData.phone
+        };
+        console.log('Customer profile would be created:', customerProfile);
+      } catch (error) {
+        console.log('Customer profile creation skipped:', error);
+      }
+      
+      // Send confirmation email
+      await EmailService.sendConfirmationEmail(finalReservationData, qrCodeUrl);
+      
+      setQrCode(qrCodeUrl);
+      setReservationData(finalReservationData);
+      
+      setCurrentStep(5);
+      
+      toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu ve admin paneline gönderildi!');
+    } catch (error) {
+      toast.error('❌ Rezervasyon oluşturulurken bir hata oluştu.');
+      console.error('Reservation error:', error);
+    }
+  };
+
+  const handleCustomerNextOld = async (customerData: any) => {
     try {
       const finalData = { ...reservationData, ...customerData };
       
@@ -256,7 +400,7 @@ export default function ReservationPage() {
                 Transfer Rezervasyonu
               </span>
             </h1>
-            <p className="text-white/70 text-lg">4 kolay adımda lüks yolculuğunuzu planlayın</p>
+            <p className="text-white/70 text-lg">5 kolay adımda lüks yolculuğunuzu planlayın</p>
           </motion.div>
         </div>
 
@@ -265,7 +409,7 @@ export default function ReservationPage() {
             {/* Step Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
-                {Array.from({ length: 4 }, (_, index) => (
+                {Array.from({ length: 5 }, (_, index) => (
                   <React.Fragment key={index}>
                     <div className="flex flex-col items-center">
                       <motion.div
@@ -294,7 +438,7 @@ export default function ReservationPage() {
                         {stepNames[index]}
                       </span>
                     </div>
-                    {index < 3 && (
+                    {index < 4 && (
                       <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: '0%' }}
@@ -312,9 +456,10 @@ export default function ReservationPage() {
             {/* Step Content */}
             <AnimatePresence mode="wait">
               {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
-              {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
+              {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
               {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-              {currentStep === 4 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
+              {currentStep === 4 && <PaymentStep key="payment" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
+              {currentStep === 5 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
           </div>
         </div>
@@ -533,10 +678,10 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 }
 
 // Vehicle Step Component
-function VehicleStep({ vehicles, services, onNext, onBack }: any) {
+function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const distance = 25; // Mock distance
+  const distance = reservationData?.distance || 25; // Use real distance from Google Maps, fallback to 25km
 
   const getPrice = (vehicle: any) => vehicle.pricePerKm * distance;
 
@@ -587,8 +732,18 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
     >
       <div className="text-center">
         <h2 className="text-3xl font-bold text-white mb-3">Araç & Fiyat Seçimi</h2>
-        <p className="text-white/70 text-lg">Size uygun lüks aracı seçin (Tahmini mesafe: {distance} km)</p>
+        <p className="text-white/70 text-lg">Size uygun lüks aracı seçin (Mesafe: {distance} km{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''})</p>
       </div>
+
+      {/* Route Visualization */}
+      {reservationData?.from && reservationData?.to && (
+        <RouteVisualization 
+          origin={reservationData.from}
+          destination={reservationData.to}
+          distance={distance}
+          duration={reservationData.estimatedDuration}
+        />
+      )}
 
       {/* Vehicle Selection */}
       <div className="space-y-6">
@@ -596,7 +751,19 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
           <Car className="h-6 w-6" />
           <span>Premium Araç Seçimi</span>
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {loadingVehicles ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <span className="ml-3 text-white">Araçlar yükleniyor...</span>
+          </div>
+        ) : vehicles.length === 0 ? (
+          <div className="text-center py-12">
+            <Car className="h-12 w-12 text-white/60 mx-auto mb-4" />
+            <p className="text-white/70">Şu anda müsait araç bulunmamaktadır.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {vehicles.map((vehicle: any) => (
             <motion.div
               key={vehicle.id}
@@ -656,7 +823,8 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
               </div>
             </motion.div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Additional Services */}
@@ -670,7 +838,19 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
             <Sparkles className="h-6 w-6" />
             <span>Ek Premium Hizmetler</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {loadingServices ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              <span className="ml-3 text-white">Hizmetler yükleniyor...</span>
+            </div>
+          ) : services.length === 0 ? (
+            <div className="text-center py-8">
+              <Sparkles className="h-8 w-8 text-white/60 mx-auto mb-3" />
+              <p className="text-white/70">Şu anda ek hizmet bulunmamaktadır.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {services.map((service: any) => (
               <motion.div
                 key={service.id}
@@ -702,7 +882,8 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
                 </div>
               </motion.div>
             ))}
-          </div>
+            </div>
+          )}
         </motion.div>
       )}
 
