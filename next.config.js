@@ -11,6 +11,7 @@ const nextConfig = {
   },
   // --- DÜZELTİLMİŞ BÖLÜM ---
   env: {
+    // Doğru değişken adı burada kullanıldı
     NEXT_PUBLIC_Maps_API_KEY: process.env.NEXT_PUBLIC_Maps_API_KEY,
   },
 };
