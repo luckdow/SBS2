@@ -160,6 +160,15 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
       isGoogleMapsLoaded = true;
       isGoogleMapsLoading = false;
       delete (window as any)[callbackName];
+      
+      // Mark the service as initialized
+      if (typeof window !== 'undefined' && window.google && window.google.maps) {
+        // Import and initialize the service
+        import('./services/googleMaps').then(({ GoogleMapsService }) => {
+          GoogleMapsService.markAsInitialized();
+        });
+      }
+      
       console.log('🗺️ Google Maps API loaded successfully for autocomplete and mapping');
       resolve();
     };
