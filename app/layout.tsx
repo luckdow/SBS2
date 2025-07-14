@@ -1,6 +1,7 @@
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { Metadata } from 'next'
+import { AuthProvider } from '../lib/contexts/AuthContext'
 
 export const metadata: Metadata = {
   title: 'SBS TRAVEL - Premium Transfer Hizmeti | Antalya VIP Transfer',
@@ -44,8 +45,10 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className="font-sans antialiased">
-        {children}
-        <Toaster position="top-right" />
+        <AuthProvider>
+          {children}
+          <Toaster position="top-right" />
+        </AuthProvider>
       </body>
     </html>
   )
