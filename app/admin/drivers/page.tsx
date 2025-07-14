@@ -23,7 +23,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
-import { extendedDriverService } from '../../../lib/services/api';
+import { realTimeDriverService } from '../../../lib/services/realTimeService';
 import { Driver } from '../../../lib/types';
 
 export default function AdminDriversPage() {
@@ -51,7 +51,7 @@ export default function AdminDriversPage() {
   const loadDrivers = async () => {
     try {
       setLoading(true);
-      const driversData = await extendedDriverService.getAll();
+      const driversData = await realTimeDriverService.getAll();
       setDrivers(driversData);
     } catch (error) {
       toast.error('Şoförler yüklenirken hata oluştu');
@@ -64,7 +64,7 @@ export default function AdminDriversPage() {
   const handleAddDriver = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await extendedDriverService.create({
+      await realTimeDriverService.create({
         ...formData,
         role: 'driver' as const,
         rating: 5.0,
@@ -85,7 +85,7 @@ export default function AdminDriversPage() {
     if (!selectedDriver) return;
     
     try {
-      await extendedDriverService.update(selectedDriver.id, formData);
+      await realTimeDriverService.update(selectedDriver.id, formData);
       await loadDrivers();
       setShowEditModal(false);
       resetForm();
@@ -99,7 +99,7 @@ export default function AdminDriversPage() {
     if (!confirm('Bu şoförü silmek istediğinizden emin misiniz?')) return;
     
     try {
-      await extendedDriverService.delete(driverId);
+      await realTimeDriverService.delete(driverId);
       await loadDrivers();
       toast.success('🗑️ Şoför silindi!');
     } catch (error) {
@@ -109,7 +109,7 @@ export default function AdminDriversPage() {
 
   const handleToggleActive = async (driverId: string, isActive: boolean) => {
     try {
-      await extendedDriverService.toggleActiveStatus(driverId, !isActive);
+      await realTimeDriverService.toggleActiveStatus(driverId, !isActive);
       await loadDrivers();
       toast.success(`✅ Şoför ${!isActive ? 'aktif' : 'pasif'} edildi!`);
     } catch (error) {

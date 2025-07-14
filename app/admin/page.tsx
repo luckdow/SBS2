@@ -36,8 +36,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { reservationService, driverService } from '../../../lib/services/reservationService';
-import { NotificationService } from '../../../lib/services/notificationService';
+import { realTimeReservationService, realTimeDriverService } from '../../lib/services/realTimeService';
+import { NotificationService } from '../../lib/services/notificationService';
 
 export default function AdminDashboard() {
   const [reservations, setReservations] = useState<any[]>([]);
@@ -123,8 +123,9 @@ export default function AdminDashboard() {
     loadData();
     
     // Real-time reservations listener
-    const unsubscribe = reservationService.onReservationsChange((newReservations) => {
+    const unsubscribe = realTimeReservationService.onReservationsChange((newReservations) => {
       setReservations(newReservations);
+      console.log('📊 Admin panel received real-time update:', newReservations.length, 'reservations');
     });
     
     return () => unsubscribe();
@@ -133,12 +134,14 @@ export default function AdminDashboard() {
   const loadData = async () => {
     try {
       setLoading(true);
+      console.log('📊 Loading admin data...');
       const [reservationsData, driversData] = await Promise.all([
-        reservationService.getReservations(),
-        driverService.getDrivers()
+        realTimeReservationService.getAll(),
+        realTimeDriverService.getAll()
       ]);
       setReservations(reservationsData);
       setDrivers(driversData);
+      console.log('✅ Admin data loaded:', reservationsData.length, 'reservations,', driversData.length, 'drivers');
     } catch (error) {
       toast.error('Veriler yüklenirken hata oluştu');
       console.error('Error loading data:', error);
@@ -151,16 +154,15 @@ export default function AdminDashboard() {
     if (!selectedReservation) return;
     
     try {
-      // Update reservation in Firebase
-      await reservationService.updateReservationStatus(
-        selectedReservation.id, 
-        'assigned', 
-        driverId
-      );
+      console.log('👨‍💼 Assigning driver:', driverId, 'to reservation:', selectedReservation.id);
+      
+      // Update reservation with real-time service
+      await realTimeReservationService.assignDriver(selectedReservation.id, driverId);
       
       // Send notification to driver
       const driver = drivers.find(d => d.id === driverId);
       if (driver) {
+        console.log('📱 Sending notification to driver:', driver.name);
         await NotificationService.sendDriverNotification(driverId, selectedReservation);
         
         // Send customer notification with driver info

@@ -26,7 +26,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
-import { extendedReservationService, extendedDriverService } from '../../../lib/services/api';
+import { realTimeReservationService, realTimeDriverService } from '../../../lib/services/realTimeService';
 import { Reservation, Driver } from '../../../lib/types';
 
 export default function AdminReservationsPage() {
@@ -45,8 +45,8 @@ export default function AdminReservationsPage() {
     try {
       setLoading(true);
       const [reservationsData, driversData] = await Promise.all([
-        extendedReservationService.getAll(),
-        extendedDriverService.getActiveDrivers()
+        realTimeReservationService.getAll(),
+        realTimeDriverService.getActiveDrivers()
       ]);
       setReservations(reservationsData);
       setDrivers(driversData);
@@ -62,7 +62,7 @@ export default function AdminReservationsPage() {
     if (!selectedReservation) return;
     
     try {
-      await extendedReservationService.assignDriver(selectedReservation.id, driverId);
+      await realTimeReservationService.assignDriver(selectedReservation.id, driverId);
       await loadData();
       setShowAssignModal(false);
       setSelectedReservation(null);
@@ -74,7 +74,7 @@ export default function AdminReservationsPage() {
 
   const handleStatusUpdate = async (reservationId: string, status: Reservation['status']) => {
     try {
-      await extendedReservationService.update(reservationId, { status });
+      await realTimeReservationService.update(reservationId, { status });
       await loadData();
       toast.success('✅ Durum güncellendi!');
     } catch (error) {
@@ -86,7 +86,7 @@ export default function AdminReservationsPage() {
     if (!confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) return;
     
     try {
-      await extendedReservationService.delete(reservationId);
+      await realTimeReservationService.delete(reservationId);
       await loadData();
       toast.success('🗑️ Rezervasyon silindi!');
     } catch (error) {

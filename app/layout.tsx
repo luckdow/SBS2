@@ -1,9 +1,6 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { Metadata } from 'next'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'SBS TRAVEL - Premium Transfer Hizmeti | Antalya VIP Transfer',
@@ -46,7 +43,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
         {children}
         <Toaster position="top-right" />
       </body>
