@@ -25,39 +25,108 @@ import {
   DollarSign,
   Target,
   Camera,
-  Sparkles
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import QRScanner from '../../components/ui/QRScanner';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { NotificationService } from '../../lib/services/notificationService';
+import { AuthService } from '../../lib/services/authService';
+import { User as AppUser } from '../../lib/types';
 
 export default function DriverPanel() {
   const [reservations, setReservations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [scanResult, setScanResult] = useState<string>('');
-  const [driverStats, setDriverStats] = useState({
-    todayTrips: 3,
-    weeklyTrips: 18,
-    monthlyEarnings: 12450,
-    rating: 4.8,
-    completionRate: 98.5,
-    totalDistance: 1250
-  });
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = AuthService.getCurrentUser();
+      if (!user) {
+        router.push('/auth/signin');
+        return;
+      }
+
+      try {
+        const profile = await AuthService.getUserProfile(user);
+        if (profile) {
+          setCurrentUser(profile);
+          
+          // Check if user has the right role for this page
+          if (profile.role !== 'driver') {
+            toast.error('Bu sayfaya erişim yetkiniz bulunmamaktadır!');
+            router.push(AuthService.getDashboardRoute(profile.role));
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+        toast.error('Profil bilgileri yüklenirken hata oluştu!');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  const handleSignOut = async () => {
+    try {
+      await AuthService.signOut();
+      toast.success('Çıkış yapıldı!');
+      router.push('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast.error('Çıkış yapılırken hata oluştu!');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null; // Will redirect to signin
+  }
+
+  // Use real driver data
+  const driverStats = {
+    todayTrips: (currentUser as any).todayTrips || 0,
+    weeklyTrips: (currentUser as any).weeklyTrips || 0,
+    monthlyEarnings: (currentUser as any).monthlyEarnings || 0,
+    rating: (currentUser as any).rating || 5.0,
+    completionRate: (currentUser as any).completionRate || 100,
+    totalDistance: (currentUser as any).totalDistance || 0
+  };
+
+  // Use real driver info
+  const driverInfo = {
+    name: currentUser.name,
+    email: currentUser.email,
+    phone: currentUser.phone || 'Belirtilmemiş',
+    licenseNumber: (currentUser as any).licenseNumber || 'Belirtilmemiş',
+    vehicleType: (currentUser as any).vehicleType || 'Belirtilmemiş',
+    vehiclePlate: (currentUser as any).vehiclePlate || 'Belirtilmemiş',
+    isActive: (currentUser as any).isActive || false,
+    avatar: (currentUser as any).avatar || null
+  };
   
   // Mock driver ID - In real app, this would come from authentication
   const driverId = 'driver-001';
-  const driverInfo = {
-    name: 'Ahmet Yılmaz',
-    vehicle: 'Mercedes E-Class',
-    plate: '34 ABC 123',
-    phone: '+90 532 123 4567',
-    rating: 4.8,
-    totalTrips: 1247
-  };
 
   // Mock reservations
   const mockReservations = [
@@ -145,7 +214,9 @@ export default function DriverPanel() {
     try {
       console.log('✅ Completing trip:', reservationId);
       await realTimeReservationService.updateStatus(reservationId, 'completed');
-      setDriverStats(prev => ({ ...prev, todayTrips: prev.todayTrips + 1 }));
+      
+      // In a real app, this would update the database and refresh the user's stats
+      // For now, we just show a success message
       
       // Send completion notification
       await NotificationService.sendCustomerNotification(
@@ -233,15 +304,24 @@ export default function DriverPanel() {
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <p className="text-sm font-medium text-white">{driverInfo.name}</p>
-                <p className="text-xs text-white/70">{driverInfo.plate} • {driverInfo.vehicle}</p>
+                <p className="text-xs text-white/70">{driverInfo.vehiclePlate} • {driverInfo.vehicleType}</p>
               </div>
               <div className="flex items-center space-x-1">
                 <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                <span className="text-white text-sm font-medium">{driverInfo.rating}</span>
+                <span className="text-white text-sm font-medium">{driverStats.rating}</span>
               </div>
-              <Link href="/" className="text-white/60 hover:text-white/80 transition-colors">
-                ← Ana Sayfa
-              </Link>
+              <div className="flex items-center space-x-4">
+                <Link href="/" className="text-white/60 hover:text-white/80 transition-colors">
+                  ← Ana Sayfa
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center space-x-2 text-white/60 hover:text-white/80 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Çıkış</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
