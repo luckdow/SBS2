@@ -45,8 +45,24 @@ export default function ReservationPage() {
   const [services, setServices] = useState<any[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
+
+  // Safe step transition with debouncing to prevent Google Maps DOM conflicts
+  const safeSetCurrentStep = React.useCallback((newStep: number) => {
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    
+    // Small delay to allow current components to cleanup properly
+    setTimeout(() => {
+      setCurrentStep(newStep);
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 300); // Allow new step to initialize
+    }, 100);
+  }, [isTransitioning]);
 
   // Load vehicles and services when component mounts
   React.useEffect(() => {
@@ -213,7 +229,7 @@ export default function ReservationPage() {
       ...routeData
     }));
     
-    setCurrentStep(2);
+    safeSetCurrentStep(2);
   };
 
   const handleVehicleNext = (vehicleData: any) => {
@@ -221,7 +237,7 @@ export default function ReservationPage() {
       ...prev, 
       ...vehicleData 
     }));
-    setCurrentStep(3);
+    safeSetCurrentStep(3);
   };
 
   const handleCustomerNext = (customerData: any) => {
@@ -230,7 +246,7 @@ export default function ReservationPage() {
       ...prev, 
       ...customerData 
     }));
-    setCurrentStep(4); // Go to payment step
+    safeSetCurrentStep(4); // Go to payment step
   };
 
   const handlePaymentNext = async (paymentData: any) => {
@@ -305,7 +321,7 @@ export default function ReservationPage() {
       setQrCode(qrCodeUrl);
       setReservationData(finalReservationData);
       
-      setCurrentStep(5); // Go to final confirmation
+      safeSetCurrentStep(5); // Go to final confirmation
       
       toast.success('🎉 Ödeme tamamlandı! Rezervasyonunuz oluşturuldu!');
     } catch (error) {
@@ -419,14 +435,31 @@ export default function ReservationPage() {
               </div>
             </div>
 
-            {/* Step Content */}
-            <AnimatePresence mode="wait">
-              {currentStep === 1 && <RouteStep key="route-step" onNext={handleRouteNext} />}
-              {currentStep === 2 && <VehicleStep key="vehicle-step" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
-              {currentStep === 3 && <CustomerInfoStep key="customer-step" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-              {currentStep === 4 && <PaymentStep key="payment-step" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
-              {currentStep === 5 && <ConfirmationStep key="confirmation-step" reservationData={reservationData} qrCode={qrCode} />}
+            {/* Step Content with Enhanced AnimatePresence */}
+            <AnimatePresence mode="wait" initial={false}>
+              {currentStep === 1 && <RouteStep key="route-step-1" onNext={handleRouteNext} disabled={isTransitioning} />}
+              {currentStep === 2 && <VehicleStep key="vehicle-step-2" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => safeSetCurrentStep(1)} disabled={isTransitioning} />}
+              {currentStep === 3 && <CustomerInfoStep key="customer-step-3" onNext={handleCustomerNext} onBack={() => safeSetCurrentStep(2)} disabled={isTransitioning} />}
+              {currentStep === 4 && <PaymentStep key="payment-step-4" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => safeSetCurrentStep(3)} disabled={isTransitioning} />}
+              {currentStep === 5 && <ConfirmationStep key="confirmation-step-5" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
+
+            {/* Transition Loading Overlay */}
+            {isTransitioning && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 rounded-3xl"
+              >
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+                  <div className="flex items-center space-x-3">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <span className="text-white font-medium">Adım geçişi...</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
       </div>
@@ -435,7 +468,7 @@ export default function ReservationPage() {
 }
 
 // Route Step Component
-function RouteStep({ onNext }: { onNext: (data: any) => void }) {
+function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; disabled?: boolean }) {
   const [formData, setFormData] = useState({
     direction: 'airport-to-hotel',
     hotelLocation: '',
@@ -482,6 +515,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >
       <div className="text-center">
@@ -637,8 +671,8 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
         <div className="flex justify-end pt-4">
           <button
             type="submit"
-            disabled={!formData.hotelLocation}
-            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            disabled={!formData.hotelLocation || disabled}
+            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2"
           >
             <span>Devam Et</span>
             <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -651,7 +685,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 }
 
 // Vehicle Step Component
-function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack }: any) {
+function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack, disabled = false }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [actualDistance, setActualDistance] = useState(reservationData?.distance || 25);
@@ -732,6 +766,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >
       <div className="text-center">
@@ -964,15 +999,16 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
       <div className="flex justify-between pt-4">
         <button
           onClick={onBack}
-          className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2"
+          disabled={disabled}
+          className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span>Geri Dön</span>
         </button>
         <button
           onClick={handleNext}
-          disabled={!selectedVehicle}
-          className="group relative px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          disabled={!selectedVehicle || disabled}
+          className="group relative px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2"
         >
           <span>Devam Et</span>
           <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -984,7 +1020,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
 }
 
 // Customer Info Step Component
-function CustomerInfoStep({ onNext, onBack }: any) {
+function CustomerInfoStep({ onNext, onBack, disabled = false }: any) {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -1033,6 +1069,7 @@ function CustomerInfoStep({ onNext, onBack }: any) {
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >
       <div className="text-center">
@@ -1177,14 +1214,16 @@ function CustomerInfoStep({ onNext, onBack }: any) {
           <button
             type="button"
             onClick={onBack}
-            className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2"
+            disabled={disabled}
+            className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
             <span>Geri Dön</span>
           </button>
           <button
             type="submit"
-            className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+            disabled={disabled}
+            className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <span>Rezervasyonu Tamamla</span>
             <CheckCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />

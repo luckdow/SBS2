@@ -1,6 +1,7 @@
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { Metadata } from 'next'
+import GoogleMapsProvider from '../components/providers/GoogleMapsProvider'
 
 export const metadata: Metadata = {
   title: 'SBS TRAVEL - Premium Transfer Hizmeti | Antalya VIP Transfer',
@@ -44,7 +45,9 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className="font-sans antialiased">
-        {children}
+        <GoogleMapsProvider>
+          {children}
+        </GoogleMapsProvider>
         <Toaster position="top-right" />
       </body>
     </html>
