@@ -35,7 +35,6 @@ import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { vehicleService, serviceService } from '../../lib/services/api';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
 import RouteVisualization from '../../components/ui/RouteVisualization';
-import PaymentStep from '../../components/ui/PaymentStep';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -46,7 +45,7 @@ export default function ReservationPage() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
 
-  const stepNames = ['Rota & Detay', 'Araç & Fiyat', 'Bilgiler', 'Ödeme', 'Onay'];
+  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Onay'];
 
   // Load vehicles and services when component mounts
   React.useEffect(() => {
@@ -225,73 +224,7 @@ export default function ReservationPage() {
     setCurrentStep(3);
   };
 
-  const handleCustomerNext = (customerData: any) => {
-    setReservationData(prev => ({ 
-      ...prev, 
-      ...customerData 
-    }));
-    setCurrentStep(4);
-  };
-
-  const handlePaymentNext = async (paymentData: any) => {
-    try {
-      const finalData = { ...reservationData, ...paymentData };
-      
-      // Generate QR code with reservation data
-      const reservationId = `RES${Date.now()}`;
-      const reservationWithId = { ...finalData, id: reservationId };
-      
-      // Create reservation with real-time service
-      const reservationForFirebase = {
-        ...reservationWithId,
-        status: 'pending' as const,
-        qrCode: reservationId,
-        customerId: `customer_${Date.now()}`,
-        firstName: finalData.firstName,
-        lastName: finalData.lastName,
-        email: finalData.email,
-        phone: finalData.phone,
-        flightNumber: finalData.flightNumber || '',
-        specialRequests: finalData.specialRequests || ''
-      };
-      
-      console.log('🚀 Creating reservation:', reservationForFirebase);
-      const actualReservationId = await realTimeReservationService.create(reservationForFirebase);
-      
-      // Update with actual Firebase ID
-      const finalReservationData = { ...reservationWithId, id: actualReservationId };
-      
-      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
-      
-      // Create user account automatically (optional, skip if fails)
-      try {
-        console.log('Creating customer profile...');
-        const customerProfile = {
-          email: finalData.email,
-          name: `${finalData.firstName} ${finalData.lastName}`,
-          phone: finalData.phone
-        };
-        console.log('Customer profile would be created:', customerProfile);
-      } catch (error) {
-        console.log('Customer profile creation skipped:', error);
-      }
-      
-      // Send confirmation email
-      await EmailService.sendConfirmationEmail(finalReservationData, qrCodeUrl);
-      
-      setQrCode(qrCodeUrl);
-      setReservationData(finalReservationData);
-      
-      setCurrentStep(5);
-      
-      toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu ve admin paneline gönderildi!');
-    } catch (error) {
-      toast.error('❌ Rezervasyon oluşturulurken bir hata oluştu.');
-      console.error('Reservation error:', error);
-    }
-  };
-
-  const handleCustomerNextOld = async (customerData: any) => {
+  const handleCustomerNext = async (customerData: any) => {
     try {
       const finalData = { ...reservationData, ...customerData };
       
@@ -324,7 +257,6 @@ export default function ReservationPage() {
       // Create user account automatically (optional, skip if fails)
       try {
         console.log('Creating customer profile...');
-        // For now, just log the profile creation - can be enhanced later
         const customerProfile = {
           email: customerData.email,
           name: `${customerData.firstName} ${customerData.lastName}`,
@@ -349,6 +281,8 @@ export default function ReservationPage() {
       console.error('Reservation error:', error);
     }
   };
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -400,7 +334,7 @@ export default function ReservationPage() {
                 Transfer Rezervasyonu
               </span>
             </h1>
-            <p className="text-white/70 text-lg">5 kolay adımda lüks yolculuğunuzu planlayın</p>
+            <p className="text-white/70 text-lg">4 kolay adımda lüks yolculuğunuzu planlayın</p>
           </motion.div>
         </div>
 
@@ -409,7 +343,7 @@ export default function ReservationPage() {
             {/* Step Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
-                {Array.from({ length: 5 }, (_, index) => (
+                {Array.from({ length: 4 }, (_, index) => (
                   <React.Fragment key={index}>
                     <div className="flex flex-col items-center">
                       <motion.div
@@ -438,7 +372,7 @@ export default function ReservationPage() {
                         {stepNames[index]}
                       </span>
                     </div>
-                    {index < 4 && (
+                    {index < 3 && (
                       <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: '0%' }}
@@ -458,8 +392,7 @@ export default function ReservationPage() {
               {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
               {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
               {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
-              {currentStep === 4 && <PaymentStep key="payment" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => setCurrentStep(3)} />}
-              {currentStep === 5 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
+              {currentStep === 4 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
           </div>
         </div>
@@ -472,18 +405,24 @@ export default function ReservationPage() {
 function RouteStep({ onNext }: { onNext: (data: any) => void }) {
   const [formData, setFormData] = useState({
     direction: 'airport-to-hotel',
-    from: '',
-    to: '',
+    hotelLocation: '',
     date: '',
     time: '',
     passengers: 1,
     baggage: 1,
-    flightNumber: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onNext(formData);
+    
+    // Set from/to based on direction and hotel location
+    const routeData = {
+      ...formData,
+      from: formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation,
+      to: formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı'
+    };
+    
+    onNext(routeData);
   };
 
   return (
@@ -494,8 +433,8 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
       className="space-y-8"
     >
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-3">Transfer Detayları</h2>
-        <p className="text-white/70 text-lg">Yolculuk bilgilerinizi girin</p>
+        <h2 className="text-3xl font-bold text-white mb-3">Rota Seçimi</h2>
+        <p className="text-white/70 text-lg">Transfer yönünüzü seçin ve otel bilgilerinizi girin</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -565,23 +504,18 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
           </div>
         </div>
 
-        {/* Addresses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Nereden</label>
-            <AddressAutocomplete
-              value={formData.from}
-              onChange={(value) => setFormData({...formData, from: value})}
-              placeholder="Başlangıç adresi"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Nereye</label>
-            <AddressAutocomplete
-              value={formData.to}
-              onChange={(value) => setFormData({...formData, to: value})}
-              placeholder="Varış adresi"
-            />
+        {/* Hotel Location Input */}
+        <div className="space-y-4">
+          <label className="block text-lg font-semibold text-white">
+            {formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}
+          </label>
+          <AddressAutocomplete
+            value={formData.hotelLocation}
+            onChange={(value) => setFormData({...formData, hotelLocation: value})}
+            placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'}
+          />
+          <div className="text-sm text-white/60 bg-white/5 rounded-lg p-3">
+            <p>💡 <strong>İpucu:</strong> Otel adını yazmaya başladığınızda Google Maps otomatik tamamlama önerileri görünecektir.</p>
           </div>
         </div>
 
@@ -616,7 +550,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
         </div>
 
         {/* Passengers and Baggage */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="block text-lg font-semibold text-white">Yolcu Sayısı</label>
             <div className="relative">
@@ -647,25 +581,13 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Uçuş No</label>
-            <div className="relative">
-              <Plane className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input
-                type="text"
-                value={formData.flightNumber}
-                onChange={(e) => setFormData({...formData, flightNumber: e.target.value})}
-                placeholder="TK1234"
-                className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/50 transition-all"
-              />
-            </div>
-          </div>
         </div>
 
         <div className="flex justify-end pt-4">
           <button
             type="submit"
-            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+            disabled={!formData.hotelLocation}
+            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
             <span>Devam Et</span>
             <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -997,7 +919,7 @@ function CustomerInfoStep({ onNext, onBack }: any) {
       className="space-y-8"
     >
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-3">İletişim Bilgileri</h2>
+        <h2 className="text-3xl font-bold text-white mb-3">Kişisel Bilgiler ve Uçuş Detayları</h2>
         <p className="text-white/70 text-lg">Rezervasyon için gerekli bilgilerinizi girin</p>
       </div>
 
@@ -1076,16 +998,19 @@ function CustomerInfoStep({ onNext, onBack }: any) {
         </div>
 
         <div className="space-y-2">
-          <label className="block text-lg font-semibold text-white">Uçuş Numarası (Opsiyonel)</label>
+          <label className="block text-lg font-semibold text-white">Uçuş Numarası</label>
           <div className="relative">
             <Plane className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
             <input
               type="text"
               value={formData.flightNumber}
               onChange={(e) => setFormData({...formData, flightNumber: e.target.value})}
-              placeholder="TK1234"
+              placeholder="Örn: TK1234, PC2152"
               className="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/50 transition-all"
             />
+          </div>
+          <div className="text-sm text-white/60 bg-white/5 rounded-lg p-3">
+            <p>💡 <strong>İpucu:</strong> Uçuş numaranızı yazarsanız şoförünüz uçuş durumunuzu takip edebilir.</p>
           </div>
         </div>
 
@@ -1096,8 +1021,39 @@ function CustomerInfoStep({ onNext, onBack }: any) {
             onChange={(e) => setFormData({...formData, specialRequests: e.target.value})}
             rows={4}
             className="w-full px-4 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none"
-            placeholder="Özel istekleriniz veya notlarınız..."
+            placeholder="Özel istekleriniz, çocuk koltuğu ihtiyacı, bagaj detayları vb..."
           />
+        </div>
+
+        {/* Auto membership info */}
+        <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-md border-2 border-green-500/50 rounded-2xl p-6">
+          <div className="flex items-center space-x-4 mb-3">
+            <div className="bg-green-500 p-3 rounded-xl">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Otomatik Üyelik</h3>
+              <p className="text-green-200">Girdiğiniz bilgilerle otomatik olarak üye olacaksınız</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Gelecek rezervasyonlarınızda daha hızlı işlem</span>
+            </div>
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Özel indirimlere erişim</span>
+            </div>
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Rezervasyon geçmişi takibi</span>
+            </div>
+            <div className="flex items-center space-x-2 text-green-200">
+              <Check className="h-4 w-4" />
+              <span>Sadakat puanları kazanma</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-between pt-4">
@@ -1306,10 +1262,16 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
       </motion.div>
 
       <div className="text-center">
-        <Link href="/" className="group inline-flex items-center text-white/80 hover:text-white font-medium text-lg transition-colors">
-          <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-          Ana Sayfaya Dön
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link href="/" className="group inline-flex items-center justify-center px-6 py-3 text-white/80 hover:text-white font-medium text-lg transition-colors border-2 border-white/30 rounded-xl hover:bg-white/10">
+            <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Ana Sayfaya Dön
+          </Link>
+          <Link href="/customer" className="group inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium text-lg rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all">
+            <Users className="h-5 w-5 mr-2" />
+            Müşteri Hesabıma Dön
+          </Link>
+        </div>
       </div>
     </motion.div>
   );
