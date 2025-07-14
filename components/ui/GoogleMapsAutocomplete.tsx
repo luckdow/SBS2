@@ -84,6 +84,22 @@ export default function GoogleMapsAutocomplete({
     return () => clearTimeout(timer);
   }, [initializeAutocomplete]);
 
+  // Cleanup autocomplete on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        if (autocompleteRef.current) {
+          // Clear event listeners and references
+          google.maps.event.clearInstanceListeners(autocompleteRef.current);
+          autocompleteRef.current = null;
+        }
+      } catch (error) {
+        // Silently handle cleanup errors
+        console.warn('Autocomplete cleanup warning:', error);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (inputRef.current && inputRef.current.value !== value) {
       inputRef.current.value = value;
