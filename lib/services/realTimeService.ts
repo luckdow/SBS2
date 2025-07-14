@@ -123,6 +123,43 @@ export class RealTimeReservationService {
     }
   }
 
+  async update(reservationId: string, updateData: any): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      console.log('🔥 Mock reservation update:', reservationId, updateData);
+      return;
+    }
+
+    try {
+      const reservationRef = doc(db, this.collectionName, reservationId);
+      await updateDoc(reservationRef, {
+        ...updateData,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Reservation updated in Firebase:', reservationId);
+    } catch (error) {
+      console.error('❌ Error updating reservation:', error);
+      console.log('Fallback: Mock reservation update');
+    }
+  }
+
+  async delete(reservationId: string): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      console.log('🔥 Mock reservation delete:', reservationId);
+      return;
+    }
+
+    try {
+      const reservationRef = doc(db, this.collectionName, reservationId);
+      await deleteDoc(reservationRef);
+      
+      console.log('✅ Reservation deleted from Firebase:', reservationId);
+    } catch (error) {
+      console.error('❌ Error deleting reservation:', error);
+      console.log('Fallback: Mock reservation delete');
+    }
+  }
+
   // Real-time listener for reservations
   onReservationsChange(callback: (reservations: Reservation[]) => void) {
     if (!isFirebaseConfigured()) {
@@ -161,7 +198,7 @@ export class RealTimeReservationService {
   async getDriverReservations(driverId: string): Promise<Reservation[]> {
     if (!isFirebaseConfigured()) {
       console.log('🔥 Using mock driver reservations for:', driverId);
-      return mockReservations.filter(res => res.driverId === driverId) as any;
+      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
     }
 
     try {
@@ -184,7 +221,7 @@ export class RealTimeReservationService {
       return reservations;
     } catch (error) {
       console.error('❌ Error loading driver reservations:', error);
-      return mockReservations.filter(res => res.driverId === driverId) as any;
+      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
     }
   }
 }
@@ -211,6 +248,90 @@ export class RealTimeDriverService {
     } catch (error) {
       console.error('❌ Error loading drivers:', error);
       return mockDrivers as any;
+    }
+  }
+
+  async create(driverData: any): Promise<string> {
+    if (!isFirebaseConfigured()) {
+      console.log('🔥 Firebase not configured, using mock data');
+      const mockId = `DRV${Date.now()}`;
+      console.log('Mock driver created:', mockId, driverData);
+      return mockId;
+    }
+
+    try {
+      const docRef = await addDoc(collection(db, this.collectionName), {
+        ...driverData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true
+      });
+      
+      console.log('✅ Driver created in Firebase:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('❌ Error creating driver:', error);
+      // Fallback to mock
+      const mockId = `DRV${Date.now()}`;
+      console.log('Fallback to mock driver:', mockId);
+      return mockId;
+    }
+  }
+
+  async update(driverId: string, updateData: any): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      console.log('🔥 Mock driver update:', driverId, updateData);
+      return;
+    }
+
+    try {
+      const driverRef = doc(db, this.collectionName, driverId);
+      await updateDoc(driverRef, {
+        ...updateData,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Driver updated in Firebase:', driverId);
+    } catch (error) {
+      console.error('❌ Error updating driver:', error);
+      console.log('Fallback: Mock driver update');
+    }
+  }
+
+  async delete(driverId: string): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      console.log('🔥 Mock driver delete:', driverId);
+      return;
+    }
+
+    try {
+      const driverRef = doc(db, this.collectionName, driverId);
+      await deleteDoc(driverRef);
+      
+      console.log('✅ Driver deleted from Firebase:', driverId);
+    } catch (error) {
+      console.error('❌ Error deleting driver:', error);
+      console.log('Fallback: Mock driver delete');
+    }
+  }
+
+  async toggleActiveStatus(driverId: string, isActive: boolean): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      console.log('🔥 Mock driver toggle status:', driverId, isActive);
+      return;
+    }
+
+    try {
+      const driverRef = doc(db, this.collectionName, driverId);
+      await updateDoc(driverRef, {
+        isActive,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Driver status toggled in Firebase:', driverId, isActive);
+    } catch (error) {
+      console.error('❌ Error toggling driver status:', error);
+      console.log('Fallback: Mock driver toggle');
     }
   }
 

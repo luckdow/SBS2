@@ -221,7 +221,7 @@ export const extendedReservationService = {
 
   async getDriverReservations(driverId: string): Promise<Reservation[]> {
     if (!isFirebaseAvailable()) {
-      return mockReservations.filter(res => res.driverId === driverId) as any;
+      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
     }
 
     try {
@@ -238,7 +238,7 @@ export const extendedReservationService = {
       } as Reservation));
     } catch (error) {
       console.error('Error getting driver reservations:', error);
-      return mockReservations.filter(res => res.driverId === driverId) as any;
+      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
     }
   }
 };
