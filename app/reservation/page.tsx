@@ -117,22 +117,26 @@ export default function ReservationPage() {
     // Calculate distance using Google Maps
     GoogleMapsService.calculateDistance(routeData.from, routeData.to)
       .then(result => {
-        setReservationData(prev => ({ 
-          ...prev, 
-          ...routeData, 
-          distance: result.distance,
-          estimatedDuration: result.duration
-        }));
+        if (result.status === 'success') {
+          setReservationData(prev => ({ 
+            ...prev, 
+            ...routeData, 
+            distance: result.distance,
+            estimatedDuration: result.duration
+          }));
+        } else {
+          console.error('Distance calculation error:', result.error);
+          // Fallback with default distance
+          setReservationData(prev => ({ ...prev, ...routeData, distance: 25, estimatedDuration: '30 dakika' }));
+        }
         setCurrentStep(2);
       })
       .catch(error => {
         console.error('Distance calculation error:', error);
         // Fallback with default distance
-        setReservationData(prev => ({ ...prev, ...routeData, distance: 25 }));
+        setReservationData(prev => ({ ...prev, ...routeData, distance: 25, estimatedDuration: '30 dakika' }));
         setCurrentStep(2);
       });
-    setReservationData(prev => ({ ...prev, ...routeData }));
-    setCurrentStep(2);
   };
 
   const handleVehicleNext = (vehicleData: any) => {

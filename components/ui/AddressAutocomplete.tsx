@@ -33,8 +33,22 @@ export default function AddressAutocomplete({
         setLoading(true);
         try {
           const results = await GoogleMapsService.getAddressSuggestions(value);
-          setSuggestions(results);
-          setShowSuggestions(true);
+          if (results.status === 'success') {
+            setSuggestions(results.suggestions);
+            setShowSuggestions(true);
+          } else {
+            console.error('Address autocomplete error:', results.error);
+            // Fallback suggestions for demo
+            setSuggestions([
+              'Antalya Havalimanı Terminal 1',
+              'Antalya Havalimanı Terminal 2',
+              'Lara Beach Hotel',
+              'Kemer Marina',
+              'Side Antik Tiyatro',
+              'Belek Golf Resort'
+            ].filter(addr => addr.toLowerCase().includes(value.toLowerCase())));
+            setShowSuggestions(true);
+          }
         } catch (error) {
           console.error('Address autocomplete error:', error);
           // Fallback suggestions for demo

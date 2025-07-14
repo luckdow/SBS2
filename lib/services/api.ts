@@ -10,22 +10,56 @@ import {
   orderBy,
   where,
   Timestamp,
-  getDoc 
+  getDoc,
+  enableNetwork,
+  disableNetwork 
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, isFirebaseConfigured } from '../firebase';
 import { Reservation, Driver, Vehicle, Service, Customer, Transaction } from '../types';
 import { mockDrivers, mockVehicles, mockServices, mockReservations } from './mockData';
 import { reservationService as firebaseReservationService } from './reservationService';
 
-// Check if Firebase is available
+// Check if Firebase is available and properly configured
 const isFirebaseAvailable = () => {
   try {
-    return !!db && typeof window !== 'undefined';
+    return !!db && typeof window !== 'undefined' && isFirebaseConfigured();
   } catch (error) {
     console.warn('Firebase not available, using mock data');
     return false;
   }
 };
+
+// Cache system for offline support
+class CacheManager {
+  private static cache = new Map();
+  private static cacheTimeout = 5 * 60 * 1000; // 5 minutes
+
+  static set(key: string, data: any) {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  static get(key: string) {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.data;
+    }
+    return null;
+  }
+
+  static clear() {
+    this.cache.clear();
+  }
+
+  static getStats() {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
+  }
+}
 
 // Generic CRUD Service with fallback to mock data
 class CRUDService<T> {
@@ -50,27 +84,56 @@ class CRUDService<T> {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
+      
+      // Clear cache to force refresh
+      CacheManager.clear();
+      console.log(`✅ Created ${this.collectionName} item ${docRef.id}`);
       return docRef.id;
     } catch (error) {
-      console.error(`Error creating ${this.collectionName}:`, error);
+      console.error(`❌ Error creating ${this.collectionName}:`, error);
       throw error;
     }
   }
 
   async getAll(): Promise<T[]> {
+    const cacheKey = `getAll-${this.collectionName}`;
+    
+    // Try cache first for offline support
+    const cached = CacheManager.get(cacheKey);
+    if (cached) {
+      console.log(`📦 Using cached data for ${this.collectionName}`);
+      return cached;
+    }
+
     if (!isFirebaseAvailable()) {
+      console.log(`🔄 Firebase not available, using mock data for ${this.collectionName}`);
       return [...this.mockData];
     }
 
     try {
       const q = query(collection(db, this.collectionName), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const data = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as T));
+      
+      // Cache the result
+      CacheManager.set(cacheKey, data);
+      console.log(`✅ Loaded ${data.length} items from ${this.collectionName}`);
+      return data;
     } catch (error) {
-      console.error(`Error getting ${this.collectionName}:`, error);
+      console.error(`❌ Error getting ${this.collectionName}:`, error);
+      
+      // Try to return cached data if available
+      const fallbackCached = CacheManager.get(cacheKey);
+      if (fallbackCached) {
+        console.log(`📦 Using stale cached data for ${this.collectionName} due to error`);
+        return fallbackCached;
+      }
+      
+      // Final fallback to mock data
+      console.log(`🔄 Using mock data for ${this.collectionName} due to error`);
       return [...this.mockData];
     }
   }
@@ -112,8 +175,12 @@ class CRUDService<T> {
         ...data,
         updatedAt: Timestamp.now()
       });
+      
+      // Clear cache to force refresh
+      CacheManager.clear();
+      console.log(`✅ Updated ${this.collectionName} item ${id}`);
     } catch (error) {
-      console.error(`Error updating ${this.collectionName}:`, error);
+      console.error(`❌ Error updating ${this.collectionName}:`, error);
       throw error;
     }
   }
@@ -130,8 +197,12 @@ class CRUDService<T> {
     try {
       const docRef = doc(db, this.collectionName, id);
       await deleteDoc(docRef);
+      
+      // Clear cache to force refresh
+      CacheManager.clear();
+      console.log(`✅ Deleted ${this.collectionName} item ${id}`);
     } catch (error) {
-      console.error(`Error deleting ${this.collectionName}:`, error);
+      console.error(`❌ Error deleting ${this.collectionName}:`, error);
       throw error;
     }
   }
@@ -240,6 +311,40 @@ export const extendedReservationService = {
       console.error('Error getting driver reservations:', error);
       return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
     }
+  }
+};
+
+// Network status management
+export const networkService = {
+  async enableOfflineMode() {
+    if (isFirebaseAvailable()) {
+      try {
+        await disableNetwork(db);
+        console.log('📱 Firebase offline mode enabled');
+      } catch (error) {
+        console.error('❌ Error enabling offline mode:', error);
+      }
+    }
+  },
+
+  async enableOnlineMode() {
+    if (isFirebaseAvailable()) {
+      try {
+        await enableNetwork(db);
+        console.log('🌐 Firebase online mode enabled');
+      } catch (error) {
+        console.error('❌ Error enabling online mode:', error);
+      }
+    }
+  },
+
+  getCacheStats() {
+    return CacheManager.getStats();
+  },
+
+  clearCache() {
+    CacheManager.clear();
+    console.log('🗑️ All cache cleared');
   }
 };
 
