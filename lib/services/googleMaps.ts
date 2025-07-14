@@ -9,6 +9,106 @@ export class GoogleMapsService {
     return !!this.apiKey && this.apiKey !== 'your_google_maps_api_key_here';
   }
 
+  // Enhanced API validation with specific service testing
+  static async validateApiConfiguration(): Promise<{
+    isValid: boolean;
+    results: {
+      geocoding: { status: string; error?: string };
+      directions: { status: string; error?: string };
+      places: { status: string; error?: string };
+    };
+    recommendations: string[];
+  }> {
+    if (!this.isConfigured()) {
+      return {
+        isValid: false,
+        results: {
+          geocoding: { status: 'NOT_CONFIGURED', error: 'API key not configured' },
+          directions: { status: 'NOT_CONFIGURED', error: 'API key not configured' },
+          places: { status: 'NOT_CONFIGURED', error: 'API key not configured' }
+        },
+        recommendations: [
+          'Configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local file',
+          'Get API key from Google Cloud Console'
+        ]
+      };
+    }
+
+    const results = {
+      geocoding: await this.testGeocodingApi(),
+      directions: await this.testDirectionsApi(), 
+      places: await this.testPlacesApi()
+    };
+
+    const isValid = Object.values(results).every(result => result.status === 'OK');
+    const recommendations = this.generateRecommendations(results);
+
+    return { isValid, results, recommendations };
+  }
+
+  // Test Geocoding API
+  private static async testGeocodingApi(): Promise<{ status: string; error?: string }> {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=Antalya,Turkey&key=${this.apiKey}`
+      );
+      const data = await response.json();
+      return { status: data.status, error: data.error_message };
+    } catch (error) {
+      return { status: 'NETWORK_ERROR', error: 'Failed to connect to Geocoding API' };
+    }
+  }
+
+  // Test Directions API
+  private static async testDirectionsApi(): Promise<{ status: string; error?: string }> {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=Antalya+Airport&destination=Lara+Beach&key=${this.apiKey}`
+      );
+      const data = await response.json();
+      return { status: data.status, error: data.error_message };
+    } catch (error) {
+      return { status: 'NETWORK_ERROR', error: 'Failed to connect to Directions API' };
+    }
+  }
+
+  // Test Places API (Note: Web Service API, not JavaScript API)
+  private static async testPlacesApi(): Promise<{ status: string; error?: string }> {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=Antalya+Airport&key=${this.apiKey}`
+      );
+      const data = await response.json();
+      return { status: data.status, error: data.error_message };
+    } catch (error) {
+      return { status: 'NETWORK_ERROR', error: 'Failed to connect to Places API' };
+    }
+  }
+
+  // Generate specific recommendations based on test results
+  private static generateRecommendations(results: any): string[] {
+    const recommendations: string[] = [];
+
+    Object.entries(results).forEach(([api, result]: [string, any]) => {
+      if (result.status === 'REQUEST_DENIED') {
+        recommendations.push(`${api.toUpperCase()} API: Enable ${api} API in Google Cloud Console`);
+      } else if (result.status === 'OVER_QUERY_LIMIT') {
+        recommendations.push(`${api.toUpperCase()} API: Check usage limits and billing configuration`);
+      } else if (result.status === 'NETWORK_ERROR') {
+        recommendations.push(`${api.toUpperCase()} API: Check network connectivity and firewall settings`);
+      }
+    });
+
+    if (recommendations.length === 0) {
+      recommendations.push('All APIs are working correctly!');
+    } else {
+      recommendations.unshift('Go to Google Cloud Console → APIs & Services → Library to enable missing APIs');
+      recommendations.push('Ensure billing is enabled for your Google Cloud project');
+    }
+
+    return recommendations;
+  }
+
   // Calculate distance between two points
   static async calculateDistance(origin: string, destination: string): Promise<{
     distance: number;

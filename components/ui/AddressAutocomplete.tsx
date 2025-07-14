@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, AlertCircle } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
-import { loadGoogleMapsAPI } from '../../lib/googleMapsLoader';
+import { loadGoogleMapsAPI, getGoogleMapsApiDiagnostics } from '../../lib/googleMapsLoader';
+import GoogleMapsDiagnostics from './GoogleMapsDiagnostics';
 
 interface AddressAutocompleteProps {
   value: string;
@@ -22,6 +23,8 @@ export default function AddressAutocomplete({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [apiError, setApiError] = useState<string>('');
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
 
@@ -31,10 +34,12 @@ export default function AddressAutocomplete({
       try {
         await loadGoogleMapsAPI();
         setGoogleMapsLoaded(true);
+        setApiError('');
         console.log('🗺️ Google Maps API loaded for autocomplete');
       } catch (error) {
         console.warn('🗺️ Google Maps API failed to load, fallback suggestions will be used:', error);
         setGoogleMapsLoaded(false);
+        setApiError(error instanceof Error ? error.message : 'Google Maps API failed to load');
       }
     };
 
@@ -142,6 +147,32 @@ export default function AddressAutocomplete({
               <span className="truncate">{suggestion}</span>
             </button>
           ))}
+          
+          {/* API Status Indicator */}
+          {!googleMapsLoaded && (
+            <div className="px-4 py-2 border-t border-white/10">
+              <div className="flex items-center space-x-2 text-xs text-white/60">
+                <AlertCircle className="h-3 w-3" />
+                <span>Google Maps API'si yüklenemedi - Statik öneriler gösteriliyor</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDiagnostics(true);
+                  }}
+                  className="text-blue-300 hover:text-blue-200 underline"
+                >
+                  Düzelt
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Enhanced Diagnostic Information */}
+      {apiError && showDiagnostics && (
+        <div className="absolute z-20 w-full mt-2">
+          <GoogleMapsDiagnostics onClose={() => setShowDiagnostics(false)} />
         </div>
       )}
     </div>
