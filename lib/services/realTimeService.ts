@@ -16,7 +16,6 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase';
 import { Reservation, Driver, Vehicle, Service } from '../types';
-import { mockDrivers, mockVehicles, mockServices, mockReservations } from './mockData';
 
 // Real-time Reservation Service
 export class RealTimeReservationService {
@@ -24,10 +23,7 @@ export class RealTimeReservationService {
 
   async create(reservationData: any): Promise<string> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Firebase not configured, using mock data');
-      const mockId = `RES${Date.now()}`;
-      console.log('Mock reservation created:', mockId, reservationData);
-      return mockId;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -42,17 +38,13 @@ export class RealTimeReservationService {
       return docRef.id;
     } catch (error) {
       console.error('❌ Error creating reservation:', error);
-      // Fallback to mock
-      const mockId = `RES${Date.now()}`;
-      console.log('Fallback to mock reservation:', mockId);
-      return mockId;
+      throw new Error('Failed to create reservation. Please try again.');
     }
   }
 
   async getAll(): Promise<Reservation[]> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Using mock reservations');
-      return mockReservations as any;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -70,14 +62,13 @@ export class RealTimeReservationService {
       return reservations;
     } catch (error) {
       console.error('❌ Error loading reservations:', error);
-      return mockReservations as any;
+      throw new Error('Failed to load reservations. Please try again.');
     }
   }
 
   async assignDriver(reservationId: string, driverId: string): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock driver assignment:', reservationId, driverId);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -92,14 +83,13 @@ export class RealTimeReservationService {
       console.log('✅ Driver assigned in Firebase:', reservationId, driverId);
     } catch (error) {
       console.error('❌ Error assigning driver:', error);
-      console.log('Fallback: Mock driver assignment');
+      throw new Error('Failed to assign driver. Please try again.');
     }
   }
 
   async updateStatus(reservationId: string, status: string): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock status update:', reservationId, status);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -119,14 +109,13 @@ export class RealTimeReservationService {
       console.log('✅ Status updated in Firebase:', reservationId, status);
     } catch (error) {
       console.error('❌ Error updating status:', error);
-      console.log('Fallback: Mock status update');
+      throw new Error('Failed to update status. Please try again.');
     }
   }
 
   async update(reservationId: string, updateData: any): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock reservation update:', reservationId, updateData);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -139,14 +128,13 @@ export class RealTimeReservationService {
       console.log('✅ Reservation updated in Firebase:', reservationId);
     } catch (error) {
       console.error('❌ Error updating reservation:', error);
-      console.log('Fallback: Mock reservation update');
+      throw new Error('Failed to update reservation. Please try again.');
     }
   }
 
   async delete(reservationId: string): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock reservation delete:', reservationId);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -156,17 +144,15 @@ export class RealTimeReservationService {
       console.log('✅ Reservation deleted from Firebase:', reservationId);
     } catch (error) {
       console.error('❌ Error deleting reservation:', error);
-      console.log('Fallback: Mock reservation delete');
+      throw new Error('Failed to delete reservation. Please try again.');
     }
   }
 
   // Real-time listener for reservations
   onReservationsChange(callback: (reservations: Reservation[]) => void) {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Using mock real-time data');
-      // Simulate real-time with mock data
-      callback(mockReservations as any);
-      return () => {}; // Return empty unsubscribe function
+      console.error('Firebase is not configured. Real-time updates are not available.');
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -184,21 +170,18 @@ export class RealTimeReservationService {
         callback(reservations);
       }, (error) => {
         console.error('❌ Real-time listener error:', error);
-        // Fallback to mock data
-        callback(mockReservations as any);
+        throw new Error('Real-time updates failed. Please refresh the page.');
       });
     } catch (error) {
       console.error('❌ Error setting up real-time listener:', error);
-      callback(mockReservations as any);
-      return () => {};
+      throw new Error('Failed to set up real-time updates. Please try again.');
     }
   }
 
   // Get driver reservations
   async getDriverReservations(driverId: string): Promise<Reservation[]> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Using mock driver reservations for:', driverId);
-      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -221,7 +204,7 @@ export class RealTimeReservationService {
       return reservations;
     } catch (error) {
       console.error('❌ Error loading driver reservations:', error);
-      return mockReservations.filter(res => (res as any).driverId === driverId || (res as any).assignedDriver === driverId) as any;
+      throw new Error('Failed to load driver reservations. Please try again.');
     }
   }
 }
@@ -232,8 +215,7 @@ export class RealTimeDriverService {
 
   async getAll(): Promise<Driver[]> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Using mock drivers');
-      return mockDrivers as any;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -247,16 +229,13 @@ export class RealTimeDriverService {
       return drivers;
     } catch (error) {
       console.error('❌ Error loading drivers:', error);
-      return mockDrivers as any;
+      throw new Error('Failed to load drivers. Please try again.');
     }
   }
 
   async create(driverData: any): Promise<string> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Firebase not configured, using mock data');
-      const mockId = `DRV${Date.now()}`;
-      console.log('Mock driver created:', mockId, driverData);
-      return mockId;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -271,17 +250,13 @@ export class RealTimeDriverService {
       return docRef.id;
     } catch (error) {
       console.error('❌ Error creating driver:', error);
-      // Fallback to mock
-      const mockId = `DRV${Date.now()}`;
-      console.log('Fallback to mock driver:', mockId);
-      return mockId;
+      throw new Error('Failed to create driver. Please try again.');
     }
   }
 
   async update(driverId: string, updateData: any): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock driver update:', driverId, updateData);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -294,14 +269,13 @@ export class RealTimeDriverService {
       console.log('✅ Driver updated in Firebase:', driverId);
     } catch (error) {
       console.error('❌ Error updating driver:', error);
-      console.log('Fallback: Mock driver update');
+      throw new Error('Failed to update driver. Please try again.');
     }
   }
 
   async delete(driverId: string): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock driver delete:', driverId);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -311,14 +285,13 @@ export class RealTimeDriverService {
       console.log('✅ Driver deleted from Firebase:', driverId);
     } catch (error) {
       console.error('❌ Error deleting driver:', error);
-      console.log('Fallback: Mock driver delete');
+      throw new Error('Failed to delete driver. Please try again.');
     }
   }
 
   async toggleActiveStatus(driverId: string, isActive: boolean): Promise<void> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Mock driver toggle status:', driverId, isActive);
-      return;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -331,14 +304,13 @@ export class RealTimeDriverService {
       console.log('✅ Driver status toggled in Firebase:', driverId, isActive);
     } catch (error) {
       console.error('❌ Error toggling driver status:', error);
-      console.log('Fallback: Mock driver toggle');
+      throw new Error('Failed to toggle driver status. Please try again.');
     }
   }
 
   async getActiveDrivers(): Promise<Driver[]> {
     if (!isFirebaseConfigured()) {
-      console.log('🔥 Using mock active drivers');
-      return mockDrivers.filter(d => d.isActive) as any;
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
     }
 
     try {
@@ -357,7 +329,7 @@ export class RealTimeDriverService {
       return drivers;
     } catch (error) {
       console.error('❌ Error loading active drivers:', error);
-      return mockDrivers.filter(d => d.isActive) as any;
+      throw new Error('Failed to load active drivers. Please try again.');
     }
   }
 }

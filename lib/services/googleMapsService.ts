@@ -7,10 +7,7 @@ export class GoogleMapsService {
 
   private static getLoader(): Loader {
     if (!this.loader) {
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        throw new Error('Google Maps API key not found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY environment variable.');
-      }
+      const apiKey = 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw';
 
       this.loader = new Loader({
         apiKey,
