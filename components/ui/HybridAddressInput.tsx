@@ -2,8 +2,7 @@
 
 'use client'
 
-import React, { useState } from 'react';
-import { MapPin, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import React from 'react';
 import GoogleMapsAutocomplete from './GoogleMapsAutocomplete';
 
 interface HybridAddressInputProps {
@@ -19,99 +18,12 @@ export default function HybridAddressInput({
   placeholder,
   className = ''
 }: HybridAddressInputProps) {
-  const [googleMapsStatus, setGoogleMapsStatus] = useState<'loading' | 'error' | 'success'>('loading');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [showFallback, setShowFallback] = useState(false);
-
-  const fallbackSuggestions = [
-    'Antalya Havalimanı Terminal 1', 'Antalya Havalimanı Terminal 2', 'Lara Beach Hotel, Antalya',
-    'Kemer Marina, Antalya', 'Side Antik Tiyatro, Manavgat', 'Belek Golf Resort, Serik', 'Kaleiçi, Antalya'
-  ];
-
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  const handleStatusChange = (status: 'loading' | 'error' | 'success', message?: string) => {
-    setGoogleMapsStatus(status);
-    if (status === 'error') {
-      setErrorMessage(message || 'Bilinmeyen bir hata oluştu.');
-      setShowFallback(true);
-    } else {
-      setShowFallback(false);
-    }
-  };
-
-  const handleFallbackInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    onChange(newValue);
-    const newSuggestions = fallbackSuggestions.filter(loc => loc.toLowerCase().includes(newValue.toLowerCase()));
-    setSuggestions(newSuggestions.slice(0, 6));
-    setShowSuggestions(true);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    onChange(suggestion);
-    setShowSuggestions(false);
-  };
-
-  if (!showFallback) {
-    return (
-      <div className="relative">
-        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-        {googleMapsStatus === 'loading' && (
-          <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400 animate-spin" />
-        )}
-        <GoogleMapsAutocomplete
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          className={className}
-          onStatusChange={handleStatusChange}
-        />
-      </div>
-    );
-  }
-
-  // Fallback UI
   return (
-    <div className="relative">
-      <div className="relative">
-        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-        <input
-          type="text"
-          value={value}
-          onChange={handleFallbackInputChange}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-          placeholder={placeholder}
-          className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-red-500/50 rounded-xl text-white placeholder-white/60 focus:border-red-500 focus:ring-2 focus:ring-red-500/50 transition-all ${className}`}
-        />
-      </div>
-
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-10 w-full mt-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {suggestions.map((suggestion, index) => (
-            <button
-              key={`suggestion-${index}`}
-              onClick={() => handleSuggestionClick(suggestion)}
-              className="w-full text-left px-4 py-3 text-white hover:bg-white/20 transition-colors flex items-center space-x-3"
-            >
-              <MapPin className="h-4 w-4 text-blue-400 flex-shrink-0" />
-              <span className="truncate">{suggestion}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-2 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
-        <div className="flex items-start space-x-2">
-          <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-red-200 text-sm">Google Maps yüklenemedi. Manuel adres girişi veya listeden seçim yapabilirsiniz.</p>
-            <p className="text-red-300 text-xs mt-1">Hata: {errorMessage}</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <GoogleMapsAutocomplete
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={className}
+    />
   );
 }

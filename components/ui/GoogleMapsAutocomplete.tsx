@@ -1,22 +1,22 @@
 'use client'
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { MapPin, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
-interface HybridAddressInputProps {
+interface GoogleMapsAutocompleteProps {
   value: string;
   onChange: (value: string, place?: google.maps.places.PlaceResult) => void;
   placeholder: string;
   className?: string;
 }
 
-export default function HybridAddressInput({
+export default function GoogleMapsAutocomplete({
   value,
   onChange,
   placeholder,
   className = ''
-}: HybridAddressInputProps) {
+}: GoogleMapsAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
