@@ -554,7 +554,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
             {!GoogleMapsService.isConfigured() && (
               <p className="text-amber-300 text-xs mt-2 flex items-center space-x-1">
                 <span>⚡</span>
-                <span>Google Maps API aktif olsaydı daha detaylı adres önerileri gösterilirdi.</span>
+                <span>Google Maps API configured - attempting to load real-time suggestions.</span>
               </p>
             )}
           </div>
