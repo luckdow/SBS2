@@ -100,37 +100,44 @@ export class GoogleMapsService {
         return this.getFallbackSuggestions(input);
       }
 
-      // Use REST API instead of browser-side service for better reliability
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:tr&language=tr&key=${this.apiKey}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.status === 'OK' && data.predictions) {
-        const result = {
-          suggestions: data.predictions.map((prediction: any) => prediction.description),
-          status: 'success' as const
-        };
-        
-        // Cache the result
-        this.cache.set(cacheKey, {
-          data: result,
-          timestamp: Date.now()
+      // Use browser-based Places AutocompleteService to avoid CORS issues
+      if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places) {
+        return new Promise((resolve) => {
+          const service = new window.google.maps.places.AutocompleteService();
+          
+          service.getPlacePredictions({
+            input: input,
+            componentRestrictions: { country: 'tr' },
+            language: 'tr',
+            types: ['establishment', 'geocode']
+          }, (predictions: any, status: any) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+              const result = {
+                suggestions: predictions.map((prediction: any) => prediction.description),
+                status: 'success' as const
+              };
+              
+              // Cache the result
+              this.cache.set(cacheKey, {
+                data: result,
+                timestamp: Date.now()
+              });
+              
+              console.log('🗺️ Address suggestions fetched via Places AutocompleteService:', result.suggestions.length, 'results');
+              resolve(result);
+            } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+              const result = { suggestions: [], status: 'success' as const };
+              this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+              resolve(result);
+            } else {
+              console.warn('🗺️ Places AutocompleteService error:', status);
+              resolve(this.getFallbackSuggestions(input));
+            }
+          });
         });
-        
-        console.log('🗺️ Address suggestions fetched via REST API:', result.suggestions.length, 'results');
-        return result;
-      } else if (data.status === 'ZERO_RESULTS') {
-        const result = { suggestions: [], status: 'success' as const };
-        this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
-        return result;
       } else {
-        throw new Error(`Places API error: ${data.status}`);
+        console.warn('🗺️ Google Maps Places API not loaded, using fallback suggestions');
+        return this.getFallbackSuggestions(input);
       }
     } catch (error) {
       console.error('🗺️ Google Places Autocomplete Error:', error);

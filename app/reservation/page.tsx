@@ -551,6 +551,9 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
           />
           <div className="text-sm text-white/60 bg-white/5 rounded-lg p-3">
             <p>💡 <strong>İpucu:</strong> Otel adını yazmaya başladığınızda Google Maps otomatik tamamlama önerileri görünecektir.</p>
+            {!GoogleMapsService.isConfigured() && (
+              <p className="text-yellow-300 text-xs mt-1">⚠️ Google Maps API yapılandırılmamış, öneri listesi sınırlı.</p>
+            )}
           </div>
         </div>
 
