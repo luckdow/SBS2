@@ -12,6 +12,7 @@ interface GoogleMapsAutocompleteProps {
   placeholder: string;
   className?: string;
   onError?: (error: string) => void;
+  onStatusChange?: (status: 'loading' | 'error' | 'success', message?: string) => void;
 }
 
 export default function GoogleMapsAutocomplete({ 
@@ -19,7 +20,8 @@ export default function GoogleMapsAutocomplete({
   onChange, 
   placeholder, 
   className = '',
-  onError 
+  onError,
+  onStatusChange
 }: GoogleMapsAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -30,8 +32,9 @@ export default function GoogleMapsAutocomplete({
   const handleError = useCallback((errorMessage: string) => {
     setError(errorMessage);
     onError?.(errorMessage);
+    onStatusChange?.('error', errorMessage);
     console.error('Google Maps Autocomplete Error:', errorMessage);
-  }, [onError]);
+  }, [onError, onStatusChange]);
 
   const initializeAutocomplete = useCallback(async () => {
     if (!inputRef.current || autocompleteRef.current || isInitialized) {
@@ -40,6 +43,7 @@ export default function GoogleMapsAutocomplete({
 
     setIsLoading(true);
     setError('');
+    onStatusChange?.('loading');
 
     try {
       const autocomplete = await GoogleMapsService.createAutocomplete(inputRef.current, {
@@ -63,6 +67,7 @@ export default function GoogleMapsAutocomplete({
       });
 
       setIsInitialized(true);
+      onStatusChange?.('success');
     } catch (error) {
       const errorMessage = error instanceof Error 
         ? `Google Maps yüklenemedi: ${error.message}` 
@@ -71,7 +76,7 @@ export default function GoogleMapsAutocomplete({
     } finally {
       setIsLoading(false);
     }
-  }, [onChange, handleError, isInitialized]);
+  }, [onChange, handleError, isInitialized, onStatusChange]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
