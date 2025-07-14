@@ -550,9 +550,12 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
             placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'}
           />
           <div className="text-sm text-white/60 bg-white/5 rounded-lg p-3">
-            <p>💡 <strong>İpucu:</strong> Otel adını yazmaya başladığınızda Google Maps otomatik tamamlama önerileri görünecektir.</p>
+            <p>💡 <strong>İpucu:</strong> Otel adını yazmaya başladığınızda öneriler görünecektir.</p>
             {!GoogleMapsService.isConfigured() && (
-              <p className="text-yellow-300 text-xs mt-1">⚠️ Google Maps API yapılandırılmamış, öneri listesi sınırlı.</p>
+              <p className="text-amber-300 text-xs mt-2 flex items-center space-x-1">
+                <span>⚡</span>
+                <span>Google Maps API aktif olsaydı daha detaylı adres önerileri gösterilirdi.</span>
+              </p>
             )}
           </div>
         </div>
