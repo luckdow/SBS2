@@ -233,6 +233,274 @@ export const serviceService = new CRUDService<Service>('services', mockServices 
 export const customerService = new CRUDService<Customer>('customers', []);
 export const transactionService = new CRUDService<Transaction>('transactions', []);
 
+// Settings Service for admin panel configuration
+export interface AppSettings {
+  id?: string;
+  // Company Info
+  companyName: string;
+  companyEmail: string;
+  companyPhone: string;
+  companyAddress: string;
+  
+  // PayTR API Settings
+  paytrMerchantId: string;
+  paytrMerchantKey: string;
+  paytrMerchantSalt: string;
+  paytrTestMode: boolean;
+  paytrActive: boolean;
+  paytrSuccessUrl: string;
+  paytrFailUrl: string;
+  
+  // Bank Transfer Settings
+  bankName: string;
+  bankBranch: string;
+  accountNumber: string;
+  iban: string;
+  accountHolder: string;
+  swiftCode: string;
+  
+  // Payment Method Settings
+  creditCardPaymentActive: boolean;
+  bankTransferPaymentActive: boolean;
+  cashPaymentActive: boolean;
+  
+  // Pricing
+  driverCommissionRate: number;
+  companyCommissionRate: number;
+  basePricePerKm: number;
+  
+  // Email Templates
+  emailTemplateReservationConfirm: string;
+  emailTemplateDriverAssigned: string;
+  emailTemplateReminder: string;
+  emailTemplateCancellation: string;
+  
+  // Notifications
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  pushNotifications: boolean;
+  
+  // System
+  autoAssignDrivers: boolean;
+  requireDriverApproval: boolean;
+  allowCancellation: boolean;
+  cancellationTimeLimit: number;
+  
+  // Security
+  requireTwoFactor: boolean;
+  sessionTimeout: number;
+  passwordMinLength: number;
+  
+  // Appearance
+  darkMode: boolean;
+  primaryColor: string;
+  secondaryColor: string;
+  
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const defaultSettings: AppSettings = {
+  // Company Info
+  companyName: 'SBS TRAVEL',
+  companyEmail: 'info@sbstravel.com',
+  companyPhone: '+90 532 123 4567',
+  companyAddress: 'Antalya, Türkiye',
+  
+  // PayTR API Settings
+  paytrMerchantId: '',
+  paytrMerchantKey: '',
+  paytrMerchantSalt: '',
+  paytrTestMode: true,
+  paytrActive: false,
+  paytrSuccessUrl: '/payment/success',
+  paytrFailUrl: '/payment/fail',
+  
+  // Bank Transfer Settings
+  bankName: 'Türkiye İş Bankası',
+  bankBranch: 'Antalya Şubesi',
+  accountNumber: '1234567890',
+  iban: 'TR12 0006 4000 0011 2345 6789 01',
+  accountHolder: 'SBS Travel Turizm Ltd. Şti.',
+  swiftCode: 'ISBKTRIS',
+  
+  // Payment Method Settings
+  creditCardPaymentActive: true,
+  bankTransferPaymentActive: true,
+  cashPaymentActive: true,
+  
+  // Pricing
+  driverCommissionRate: 75,
+  companyCommissionRate: 25,
+  basePricePerKm: 8,
+  
+  // Email Templates
+  emailTemplateReservationConfirm: 'Rezervasyonunuz onaylandı. QR kodunuz ektedir.',
+  emailTemplateDriverAssigned: 'Şoförünüz atandı: {{driverName}} - {{driverPhone}}',
+  emailTemplateReminder: 'Rezervasyonunuz 24 saat içinde başlayacak.',
+  emailTemplateCancellation: 'Rezervasyonunuz iptal edildi.',
+  
+  // Notifications
+  emailNotifications: true,
+  smsNotifications: true,
+  pushNotifications: true,
+  
+  // System
+  autoAssignDrivers: true,
+  requireDriverApproval: false,
+  allowCancellation: true,
+  cancellationTimeLimit: 30,
+  
+  // Security
+  requireTwoFactor: false,
+  sessionTimeout: 60,
+  passwordMinLength: 8,
+  
+  // Appearance
+  darkMode: true,
+  primaryColor: '#3B82F6',
+  secondaryColor: '#8B5CF6'
+};
+
+export const settingsService = {
+  async getSettings(): Promise<AppSettings> {
+    const cacheKey = 'app-settings';
+    
+    // Try cache first
+    const cached = CacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    if (!isFirebaseAvailable()) {
+      return { ...defaultSettings };
+    }
+
+    try {
+      const q = query(collection(db, 'settings'), orderBy('updatedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.docs.length > 0) {
+        const settings = {
+          id: querySnapshot.docs[0].id,
+          ...querySnapshot.docs[0].data()
+        } as AppSettings;
+        
+        // Cache the result
+        CacheManager.set(cacheKey, settings);
+        return settings;
+      } else {
+        // Create default settings if none exist
+        const docRef = await addDoc(collection(db, 'settings'), {
+          ...defaultSettings,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+        
+        const newSettings = {
+          id: docRef.id,
+          ...defaultSettings
+        };
+        
+        CacheManager.set(cacheKey, newSettings);
+        return newSettings;
+      }
+    } catch (error) {
+      console.error('Error getting settings:', error);
+      return { ...defaultSettings };
+    }
+  },
+
+  async updateSettings(settings: Partial<AppSettings>): Promise<void> {
+    if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available, settings not persisted');
+      return;
+    }
+
+    try {
+      // Get current settings first
+      const currentSettings = await this.getSettings();
+      
+      if (currentSettings.id) {
+        // Update existing
+        const docRef = doc(db, 'settings', currentSettings.id);
+        await updateDoc(docRef, {
+          ...settings,
+          updatedAt: Timestamp.now()
+        });
+      } else {
+        // Create new
+        await addDoc(collection(db, 'settings'), {
+          ...defaultSettings,
+          ...settings,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+      }
+      
+      // Clear cache to force refresh
+      CacheManager.clear();
+      console.log('✅ Settings updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating settings:', error);
+      throw error;
+    }
+  },
+
+  async resetToDefaults(): Promise<void> {
+    return this.updateSettings(defaultSettings);
+  },
+
+  // Get specific payment settings for frontend
+  async getPaymentSettings(): Promise<{
+    creditCardActive: boolean;
+    bankTransferActive: boolean;
+    cashActive: boolean;
+    bankDetails?: {
+      bankName: string;
+      accountHolder: string;
+      iban: string;
+      accountNumber: string;
+      swiftCode: string;
+    };
+    paytrConfig?: {
+      merchantId: string;
+      testMode: boolean;
+      successUrl: string;
+      failUrl: string;
+    };
+  }> {
+    const settings = await this.getSettings();
+    
+    const result = {
+      creditCardActive: settings.creditCardPaymentActive && settings.paytrActive,
+      bankTransferActive: settings.bankTransferPaymentActive,
+      cashActive: settings.cashPaymentActive
+    } as any;
+
+    if (settings.bankTransferPaymentActive) {
+      result.bankDetails = {
+        bankName: settings.bankName,
+        accountHolder: settings.accountHolder,
+        iban: settings.iban,
+        accountNumber: settings.accountNumber,
+        swiftCode: settings.swiftCode
+      };
+    }
+
+    if (settings.creditCardPaymentActive && settings.paytrActive) {
+      result.paytrConfig = {
+        merchantId: settings.paytrMerchantId,
+        testMode: settings.paytrTestMode,
+        successUrl: settings.paytrSuccessUrl,
+        failUrl: settings.paytrFailUrl
+      };
+    }
+
+    return result;
+  }
+};
+
 // Extended Reservation Service
 export const extendedReservationService = {
   // Use Firebase service if available, fallback to CRUD

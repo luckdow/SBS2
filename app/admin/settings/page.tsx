@@ -23,21 +23,24 @@ import {
   FileText,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Building2,
+  Banknote,
+  Wallet
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { settingsService, AppSettings } from '../../../lib/services/api';
 
 export default function AdminSettingsPage() {
   const [showPayTRKeys, setShowPayTRKeys] = useState(false);
-  const [settings, setSettings] = useState({
-    // Company Info
+  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<AppSettings>({
+    // Default values will be loaded from service
     companyName: 'SBS TRAVEL',
     companyEmail: 'info@sbstravel.com',
     companyPhone: '+90 532 123 4567',
     companyAddress: 'Antalya, Türkiye',
-    
-    // PayTR API Settings
     paytrMerchantId: '',
     paytrMerchantKey: '',
     paytrMerchantSalt: '',
@@ -45,53 +48,75 @@ export default function AdminSettingsPage() {
     paytrActive: false,
     paytrSuccessUrl: '/payment/success',
     paytrFailUrl: '/payment/fail',
-    
-    // Pricing
+    bankName: 'Türkiye İş Bankası',
+    bankBranch: 'Antalya Şubesi',
+    accountNumber: '1234567890',
+    iban: 'TR12 0006 4000 0011 2345 6789 01',
+    accountHolder: 'SBS Travel Turizm Ltd. Şti.',
+    swiftCode: 'ISBKTRIS',
+    creditCardPaymentActive: true,
+    bankTransferPaymentActive: true,
+    cashPaymentActive: true,
     driverCommissionRate: 75,
     companyCommissionRate: 25,
     basePricePerKm: 8,
-    
-    // Email Templates
     emailTemplateReservationConfirm: 'Rezervasyonunuz onaylandı. QR kodunuz ektedir.',
     emailTemplateDriverAssigned: 'Şoförünüz atandı: {{driverName}} - {{driverPhone}}',
     emailTemplateReminder: 'Rezervasyonunuz 24 saat içinde başlayacak.',
     emailTemplateCancellation: 'Rezervasyonunuz iptal edildi.',
-    
-    // Notifications
     emailNotifications: true,
     smsNotifications: true,
     pushNotifications: true,
-    
-    // System
     autoAssignDrivers: true,
     requireDriverApproval: false,
     allowCancellation: true,
     cancellationTimeLimit: 30,
-    
-    // Security
     requireTwoFactor: false,
     sessionTimeout: 60,
     passwordMinLength: 8,
-    
-    // Appearance
     darkMode: true,
     primaryColor: '#3B82F6',
     secondaryColor: '#8B5CF6'
   });
 
+  // Load settings on mount
+  React.useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const loadedSettings = await settingsService.getSettings();
+      setSettings(loadedSettings);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      toast.error('Ayarlar yüklenirken hata oluştu.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
-      // Here you would save to your backend/database
+      await settingsService.updateSettings(settings);
       toast.success('✅ Ayarlar başarıyla kaydedildi!');
     } catch (error) {
+      console.error('Error saving settings:', error);
       toast.error('❌ Ayarlar kaydedilirken hata oluştu.');
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm('Tüm ayarları varsayılan değerlere sıfırlamak istediğinizden emin misiniz?')) {
-      // Reset to default values
-      toast.success('🔄 Ayarlar sıfırlandı!');
+      try {
+        await settingsService.resetToDefaults();
+        await loadSettings(); // Reload settings
+        toast.success('🔄 Ayarlar sıfırlandı!');
+      } catch (error) {
+        console.error('Error resetting settings:', error);
+        toast.error('❌ Ayarlar sıfırlanırken hata oluştu.');
+      }
     }
   };
 
@@ -126,6 +151,13 @@ export default function AdminSettingsPage() {
       </header>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+            <span className="ml-4 text-white text-lg">Ayarlar yükleniyor...</span>
+          </div>
+        ) : (
+          <>
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <motion.div
@@ -286,7 +318,179 @@ export default function AdminSettingsPage() {
             </div>
           </motion.div>
 
-          {/* Pricing Settings */}
+          {/* Bank Transfer Settings */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
+          >
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+              <Building2 className="h-6 w-6 text-blue-400" />
+              <span>Banka Havalesi Ayarları</span>
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-3 h-3 rounded-full ${settings.bankTransferPaymentActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-white">Banka Havalesi</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.bankTransferPaymentActive}
+                    onChange={(e) => setSettings({...settings, bankTransferPaymentActive: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Banka Adı</label>
+                  <input
+                    type="text"
+                    value={settings.bankName}
+                    onChange={(e) => setSettings({...settings, bankName: e.target.value})}
+                    className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Şube</label>
+                  <input
+                    type="text"
+                    value={settings.bankBranch}
+                    onChange={(e) => setSettings({...settings, bankBranch: e.target.value})}
+                    className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Hesap Sahibi</label>
+                <input
+                  type="text"
+                  value={settings.accountHolder}
+                  onChange={(e) => setSettings({...settings, accountHolder: e.target.value})}
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">IBAN</label>
+                  <input
+                    type="text"
+                    value={settings.iban}
+                    onChange={(e) => setSettings({...settings, iban: e.target.value})}
+                    placeholder="TR12 3456 7890 1234 5678 9012 34"
+                    className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Hesap Numarası</label>
+                  <input
+                    type="text"
+                    value={settings.accountNumber}
+                    onChange={(e) => setSettings({...settings, accountNumber: e.target.value})}
+                    className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">SWIFT Kodu</label>
+                <input
+                  type="text"
+                  value={settings.swiftCode}
+                  onChange={(e) => setSettings({...settings, swiftCode: e.target.value})}
+                  placeholder="ISBKTRIS"
+                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Payment Methods Control */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.17 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
+          >
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+              <Wallet className="h-6 w-6 text-green-400" />
+              <span>Ödeme Yöntemleri</span>
+            </h3>
+            <div className="space-y-6">
+              {/* Credit Card Payment */}
+              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-xl">
+                    <CreditCard className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">Kredi Kartı</h4>
+                    <p className="text-sm text-white/70">PayTR entegrasyonu ile güvenli ödeme</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.creditCardPaymentActive}
+                    onChange={(e) => setSettings({...settings, creditCardPaymentActive: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* Bank Transfer Payment */}
+              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-gradient-to-r from-green-500 to-blue-600 p-3 rounded-xl">
+                    <Building2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">Banka Havalesi</h4>
+                    <p className="text-sm text-white/70">Müşteriye banka bilgileri gösterilir</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.bankTransferPaymentActive}
+                    onChange={(e) => setSettings({...settings, bankTransferPaymentActive: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* Cash Payment */}
+              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-gradient-to-r from-yellow-500 to-orange-600 p-3 rounded-xl">
+                    <Banknote className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">Nakit Ödeme</h4>
+                    <p className="text-sm text-white/70">Şoföre nakit ödeme seçeneği</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.cashPaymentActive}
+                    onChange={(e) => setSettings({...settings, cashPaymentActive: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -338,7 +542,7 @@ export default function AdminSettingsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.25 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
@@ -390,7 +594,7 @@ export default function AdminSettingsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.3 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
@@ -450,7 +654,7 @@ export default function AdminSettingsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.35 }}
             className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6"
           >
             <h3 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
@@ -506,7 +710,7 @@ export default function AdminSettingsPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.4 }}
           className="mt-8 text-center"
         >
           <button 
@@ -517,6 +721,8 @@ export default function AdminSettingsPage() {
             <span className="text-lg font-semibold">Tüm Ayarları Kaydet</span>
           </button>
         </motion.div>
+        </>
+        )}
       </div>
     </div>
   );
