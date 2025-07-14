@@ -61,6 +61,14 @@ export default function GoogleMapsProvider({ children }: { children: React.React
     };
 
     loadGoogleMaps();
+
+    // Cleanup function to handle provider unmount
+    return () => {
+      // Force cleanup all Google Maps elements when provider unmounts
+      GoogleMapsService.safeDOMOperation(() => {
+        GoogleMapsService.forceCleanupAllGoogleMapsElements();
+      }, 'GoogleMapsProvider cleanup on unmount', undefined);
+    };
   }, []);
 
   const value: GoogleMapsContextType = {

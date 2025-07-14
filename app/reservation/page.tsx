@@ -36,6 +36,7 @@ import { vehicleService, serviceService } from '../../lib/services/api';
 import HybridAddressInput from '../../components/ui/HybridAddressInput';
 import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import PaymentStep from '../../components/ui/PaymentStep';
+import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -49,19 +50,44 @@ export default function ReservationPage() {
 
   const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
 
-  // Safe step transition with debouncing to prevent Google Maps DOM conflicts
-  const safeSetCurrentStep = React.useCallback((newStep: number) => {
+  // Safe step transition with enhanced debouncing and Google Maps cleanup to prevent DOM conflicts
+  const safeSetCurrentStep = React.useCallback(async (newStep: number) => {
     if (isTransitioning) return;
     
     setIsTransitioning(true);
     
-    // Small delay to allow current components to cleanup properly
-    setTimeout(() => {
-      setCurrentStep(newStep);
+    try {
+      // Enhanced Google Maps cleanup before step transition
+      await GoogleMapsService.safeStepTransitionCleanup(150);
+      
+      // Increased delay to allow current components to cleanup properly, especially Google Maps
+      setTimeout(async () => {
+        try {
+          // Additional cleanup right before step change
+          await GoogleMapsService.forceCleanupAllGoogleMapsElements();
+          
+          setCurrentStep(newStep);
+          
+          // Increased timeout to allow new step to initialize properly
+          setTimeout(() => {
+            setIsTransitioning(false);
+          }, 500); // Increased from 300ms to 500ms
+        } catch (error) {
+          console.warn('Step transition error (non-critical):', error);
+          setCurrentStep(newStep);
+          setIsTransitioning(false);
+        }
+      }, 250); // Increased from 100ms to 250ms
+    } catch (error) {
+      console.warn('Pre-transition cleanup error (non-critical):', error);
+      // Fallback to original behavior if enhanced cleanup fails
       setTimeout(() => {
-        setIsTransitioning(false);
-      }, 300); // Allow new step to initialize
-    }, 100);
+        setCurrentStep(newStep);
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 500);
+      }, 250);
+    }
   }, [isTransitioning]);
 
   // Load vehicles and services when component mounts

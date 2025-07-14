@@ -96,16 +96,17 @@ export default function GoogleMapsAutocomplete({
             while (containerRef.current.firstChild && containerRef.current.firstChild !== inputRef.current) {
               try {
                 const child = containerRef.current.firstChild;
-                if (child.parentNode === containerRef.current) {
-                  containerRef.current.removeChild(child);
-                }
+                // Use defensive DOM removal
+                GoogleMapsService.safeRemoveElement(child as HTMLElement);
               } catch (removeError) {
                 console.warn('Could not remove child element:', removeError);
                 break;
               }
             }
             
-            containerRef.current.appendChild(modernElement);
+            GoogleMapsService.safeDOMOperation(() => {
+              containerRef.current?.appendChild(modernElement);
+            }, 'Append modern autocomplete element');
           } catch (appendError) {
             console.warn('Could not append modern autocomplete element:', appendError);
             // Fallback to legacy if modern element can't be added
@@ -172,14 +173,18 @@ export default function GoogleMapsAutocomplete({
     };
   }, [initializeAutocomplete]);
 
-  // Cleanup autocomplete on unmount
+  // Enhanced cleanup autocomplete on unmount with defensive DOM operations
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       if (autocompleteRef.current) {
-        GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
-        autocompleteRef.current = null;
-        autocompleteTypeRef.current = null;
+        GoogleMapsService.safeDOMOperation(async () => {
+          await GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
+          autocompleteRef.current = null;
+          autocompleteTypeRef.current = null;
+          // Additional cleanup of any autocomplete-related elements
+          GoogleMapsService.forceCleanupAllGoogleMapsElements();
+        }, 'Autocomplete component cleanup', undefined);
       }
     };
   }, []);
@@ -201,9 +206,13 @@ export default function GoogleMapsAutocomplete({
     setError('');
     setIsInitialized(false);
     if (autocompleteRef.current) {
-      GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
-      autocompleteRef.current = null;
-      autocompleteTypeRef.current = null;
+      GoogleMapsService.safeDOMOperation(async () => {
+        await GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
+        autocompleteRef.current = null;
+        autocompleteTypeRef.current = null;
+        // Force cleanup before retry
+        GoogleMapsService.forceCleanupAllGoogleMapsElements();
+      }, 'Autocomplete retry cleanup', undefined);
     }
     initializeAutocomplete();
   };

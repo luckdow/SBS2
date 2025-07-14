@@ -34,10 +34,10 @@ export default function HybridRouteDisplay({
   const [errorMessage, setErrorMessage] = useState('');
   const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
 
-  // Cleanup function to prevent DOM manipulation errors
-  const cleanup = useCallback(() => {
+  // Enhanced cleanup function to prevent DOM manipulation errors
+  const cleanup = useCallback(async () => {
     try {
-      // Enhanced safety checks with additional validation
+      // Enhanced safety checks with additional validation and defensive DOM operations
       if (directionsRendererRef.current) {
         try {
           // Check if map container is still valid before cleanup
@@ -46,8 +46,14 @@ export default function HybridRouteDisplay({
             // Additional check: ensure map div is still connected and our ref matches
             if (GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
               // Only attempt cleanup if all elements are still properly connected
-              directionsRendererRef.current.setDirections({ routes: [] } as any);
-              directionsRendererRef.current.setMap(null);
+              GoogleMapsService.safeDOMOperation(
+                () => directionsRendererRef.current?.setDirections({ routes: [] } as any),
+                'Clear directions'
+              );
+              GoogleMapsService.safeDOMOperation(
+                () => directionsRendererRef.current?.setMap(null),
+                'Clear directions renderer map'
+              );
             } else {
               console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
             }
@@ -62,7 +68,10 @@ export default function HybridRouteDisplay({
 
       if (mapInstanceRef.current) {
         try {
-          const mapDiv = mapInstanceRef.current.getDiv();
+          const mapDiv = GoogleMapsService.safeDOMOperation(
+            () => mapInstanceRef.current?.getDiv(),
+            'Get map div for cleanup'
+          );
           // Only validate if the map container matches our reference and is still connected
           if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
             // Google Maps cleanup happens automatically when DOM element is removed
@@ -75,12 +84,23 @@ export default function HybridRouteDisplay({
         }
         mapInstanceRef.current = null;
       }
+
+      // Force cleanup any remaining Google Maps elements specific to this component
+      if (mapRef.current) {
+        GoogleMapsService.safeDOMOperation(() => {
+          // Clear any remaining Google Maps elements within our container
+          const gmElements = mapRef.current?.querySelectorAll('[class*="gm-"], .pac-container');
+          gmElements?.forEach(element => {
+            GoogleMapsService.safeRemoveElement(element as HTMLElement);
+          });
+        }, 'Clean remaining Google Maps elements in route container');
+      }
     } catch (error) {
       console.warn('Route cleanup warning (non-critical):', error);
     }
   }, []);
 
-  // Enhanced cleanup on unmount with abort controller for pending operations
+  // Enhanced cleanup on unmount with abort controller for pending operations and defensive DOM operations
   useEffect(() => {
     const abortController = new AbortController();
     
@@ -89,8 +109,13 @@ export default function HybridRouteDisplay({
       isMountedRef.current = false;
       // Signal any pending operations to abort
       abortController.abort();
-      // Clean up Google Maps elements
-      cleanup();
+      
+      // Enhanced cleanup with error handling
+      GoogleMapsService.safeDOMOperation(async () => {
+        await cleanup();
+        // Additional forced cleanup of any Google Maps elements
+        GoogleMapsService.forceCleanupAllGoogleMapsElements();
+      }, 'Route component unmount cleanup', undefined);
     };
   }, [cleanup]);
 
