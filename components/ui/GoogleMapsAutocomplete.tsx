@@ -1,8 +1,6 @@
-// components/ui/GoogleMapsAutocomplete.tsx
-
 'use client'
 
-import React, { useEffect, useRef, useState, useCallback } from 'react'; // <-- EKSİK OLAN SATIR BUYDU
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, AlertCircle, Loader2 } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
