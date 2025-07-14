@@ -58,6 +58,8 @@ export default function GoogleMapsRouteDisplay({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -66,20 +68,50 @@ export default function GoogleMapsRouteDisplay({
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
 
   const handleError = useCallback((errorMessage: string) => {
+    if (!isMountedRef.current) return;
+    
     setError(errorMessage);
     onError?.(errorMessage);
     console.error('Google Maps Route Error:', errorMessage);
   }, [onError]);
 
+  const safeCleanup = useCallback(async () => {
+    try {
+      // Cancel any ongoing operations
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
+      // Safe cleanup of Google Maps components
+      await GoogleMapsService.safeMapCleanup(mapInstanceRef.current, directionsRendererRef.current);
+      
+      mapInstanceRef.current = null;
+      directionsRendererRef.current = null;
+    } catch (error) {
+      // Silent cleanup - don't propagate errors
+      console.warn('Route display cleanup warning:', error);
+    }
+  }, []);
+
   const initializeMap = useCallback(async () => {
-    if (!mapRef.current || mapInstanceRef.current) {
+    if (!isMountedRef.current || !mapRef.current || mapInstanceRef.current) {
       return;
     }
+
+    // Create new AbortController for this operation
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     setIsLoading(true);
     setError('');
 
     try {
+      // Validate element before async operation
+      await GoogleMapsService.validateElementDuringAsync(mapRef.current, 'Map initialization');
+      
+      if (signal.aborted || !isMountedRef.current) return;
+
       const map = await GoogleMapsService.createMap(mapRef.current, {
         zoom: 10,
         center: { lat: 36.8969, lng: 30.7133 }, // Antalya center
@@ -88,10 +120,19 @@ export default function GoogleMapsRouteDisplay({
         fullscreenControl: true
       });
 
+      if (signal.aborted || !isMountedRef.current) {
+        // Cleanup map if component unmounted during creation
+        await GoogleMapsService.safeMapCleanup(map);
+        return;
+      }
+
       mapInstanceRef.current = map;
 
       // Load google maps first to get the constructor
       const google = await GoogleMapsService.loadGoogleMaps();
+      
+      if (signal.aborted || !isMountedRef.current) return;
+
       const directionsRenderer = new google.maps.DirectionsRenderer({
         suppressMarkers: false,
         polylineOptions: {
@@ -104,19 +145,25 @@ export default function GoogleMapsRouteDisplay({
       directionsRenderer.setMap(map);
       directionsRendererRef.current = directionsRenderer;
 
-      setIsInitialized(true);
+      if (isMountedRef.current) {
+        setIsInitialized(true);
+      }
     } catch (error) {
+      if (!isMountedRef.current || signal.aborted) return;
+      
       const errorMessage = error instanceof Error 
         ? `Google Maps yüklenemedi: ${error.message}` 
         : 'Google Maps servisi kullanılamıyor.';
       handleError(errorMessage);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [handleError]);
 
   const calculateRoute = useCallback(async (travelMode: google.maps.TravelMode) => {
-    if (!origin || !destination || !directionsRendererRef.current) {
+    if (!isMountedRef.current || !origin || !destination || !directionsRendererRef.current) {
       return;
     }
 
@@ -130,7 +177,12 @@ export default function GoogleMapsRouteDisplay({
         travelMode
       );
 
-      directionsRendererRef.current.setDirections(result);
+      if (!isMountedRef.current) return;
+
+      // Safely set directions
+      if (directionsRendererRef.current && GoogleMapsService.safeElementCheck(mapRef.current!)) {
+        directionsRendererRef.current.setDirections(result);
+      }
 
       const route = result.routes[0];
       const leg = route.legs[0];
@@ -143,51 +195,75 @@ export default function GoogleMapsRouteDisplay({
         travelMode
       };
 
-      setRouteInfo(routeData);
+      if (isMountedRef.current) {
+        setRouteInfo(routeData);
 
-      // Callback to parent component
-      onRouteCalculated?.({
-        distance: Math.round((leg.distance?.value || 0) / 1000), // Convert to km
-        duration: leg.duration?.value || 0,
-        distanceText: leg.distance?.text || '',
-        durationText: leg.duration?.text || ''
-      });
+        // Callback to parent component
+        onRouteCalculated?.({
+          distance: Math.round((leg.distance?.value || 0) / 1000), // Convert to km
+          duration: leg.duration?.value || 0,
+          distanceText: leg.distance?.text || '',
+          durationText: leg.duration?.text || ''
+        });
+      }
 
     } catch (error) {
+      if (!isMountedRef.current) return;
+      
       const errorMessage = error instanceof Error 
         ? `Rota hesaplanamadı: ${error.message}` 
         : 'Rota hesaplama hatası.';
       handleError(errorMessage);
       
-      // Clear any existing route
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setDirections({ routes: [] } as any);
+      // Safely clear any existing route
+      if (directionsRendererRef.current && GoogleMapsService.safeElementCheck(mapRef.current!)) {
+        try {
+          directionsRendererRef.current.setDirections({ routes: [] } as any);
+        } catch (cleanupError) {
+          console.warn('Route cleanup warning:', cleanupError);
+        }
       }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [origin, destination, originPlace, destinationPlace, onRouteCalculated, handleError]);
 
   const handleTravelModeChange = (travelMode: google.maps.TravelMode) => {
+    if (!isMountedRef.current) return;
     setSelectedTravelMode(travelMode);
     calculateRoute(travelMode);
   };
 
   const handleRetry = () => {
+    if (!isMountedRef.current) return;
+    
     setError('');
     if (isInitialized) {
       calculateRoute(selectedTravelMode);
     } else {
-      initializeMap();
+      safeCleanup().then(() => {
+        if (isMountedRef.current) {
+          setIsInitialized(false);
+          initializeMap();
+        }
+      });
     }
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     initializeMap();
-  }, [initializeMap]);
+
+    return () => {
+      isMountedRef.current = false;
+      safeCleanup();
+    };
+  }, [initializeMap, safeCleanup]);
 
   useEffect(() => {
-    if (isInitialized && origin && destination) {
+    if (isMountedRef.current && isInitialized && origin && destination) {
       calculateRoute(selectedTravelMode);
     }
   }, [isInitialized, origin, destination, selectedTravelMode, calculateRoute]);
