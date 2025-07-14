@@ -23,8 +23,11 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   
   if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
+    console.error('🗺️ Google Maps API key not configured');
     return Promise.reject(new Error('Google Maps API key not configured'));
   }
+
+  console.log('🗺️ Loading Google Maps API with key:', apiKey.substring(0, 8) + '...');
 
   // Check if script is already in the DOM
   const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
@@ -64,6 +67,7 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
       isGoogleMapsLoaded = true;
       isGoogleMapsLoading = false;
       delete (window as any)[callbackName];
+      console.log('🗺️ Google Maps API loaded successfully for autocomplete and mapping');
       resolve();
     };
 
@@ -74,6 +78,17 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
     script.onerror = () => {
       isGoogleMapsLoading = false;
       delete (window as any)[callbackName];
+      console.error('🗺️ Google Maps API script failed to load. Possible causes:', {
+        url: script.src,
+        keyPrefix: apiKey.substring(0, 8) + '...',
+        possibleIssues: [
+          'API key might have domain restrictions',
+          'JavaScript API might not be enabled for this key',
+          'Places API might not be enabled for this key',
+          'API key might be invalid or suspended',
+          'Billing might not be enabled for this project'
+        ]
+      });
       reject(new Error('Google Maps API failed to load'));
     };
 
