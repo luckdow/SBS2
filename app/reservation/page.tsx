@@ -32,17 +32,93 @@ import { GoogleMapsService } from '../../lib/services/googleMaps';
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
+import { vehicleService, serviceService } from '../../lib/services/api';
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete';
+import RouteVisualization from '../../components/ui/RouteVisualization';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [reservationData, setReservationData] = useState<any>({});
   const [qrCode, setQrCode] = useState('');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(false);
 
   const stepNames = ['Rota & Detay', 'Araç & Fiyat', 'Bilgiler', 'Onay'];
 
-  // Mock vehicles data
-  const vehicles = [
+  // Load vehicles and services when component mounts
+  React.useEffect(() => {
+    loadVehiclesAndServices();
+  }, []);
+
+  const loadVehiclesAndServices = async () => {
+    setLoadingVehicles(true);
+    setLoadingServices(true);
+    
+    try {
+      // Load vehicles from admin panel
+      const vehiclesData = await vehicleService.getAll();
+      const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
+      setVehicles(activeVehicles.map(vehicle => ({
+        ...vehicle,
+        gradient: getVehicleGradient(vehicle.type || 'sedan')
+      })));
+    } catch (error) {
+      console.error('Error loading vehicles:', error);
+      // Fallback to mock data
+      setVehicles(mockVehicles);
+    } finally {
+      setLoadingVehicles(false);
+    }
+
+    try {
+      // Load services from admin panel
+      const servicesData = await serviceService.getAll();
+      const activeServices = servicesData.filter(service => service.isActive !== false);
+      setServices(activeServices.map(service => ({
+        ...service,
+        icon: getServiceIcon(service.category || 'extra'),
+        gradient: getServiceGradient(service.category || 'extra')
+      })));
+    } catch (error) {
+      console.error('Error loading services:', error);
+      // Fallback to mock data
+      setServices(mockServices);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
+  const getVehicleGradient = (type: string) => {
+    switch (type) {
+      case 'sedan': return 'from-blue-400 to-blue-600';
+      case 'suv': return 'from-purple-400 to-purple-600';
+      case 'van': return 'from-yellow-400 to-orange-500';
+      default: return 'from-gray-400 to-gray-600';
+    }
+  };
+
+  const getServiceIcon = (category: string) => {
+    switch (category) {
+      case 'child_seat': return Gift;
+      case 'extra_baggage': return Luggage;
+      case 'meet_greet': return Plane;
+      default: return Users;
+    }
+  };
+
+  const getServiceGradient = (category: string) => {
+    switch (category) {
+      case 'child_seat': return 'from-pink-400 to-pink-600';
+      case 'extra_baggage': return 'from-blue-400 to-blue-600';
+      case 'meet_greet': return 'from-purple-400 to-purple-600';
+      default: return 'from-green-400 to-green-600';
+    }
+  };
+
+  // Mock vehicles data (fallback)
+  const mockVehicles = [
     {
       id: '1',
       name: 'Ekonomi Sedan',
@@ -78,7 +154,8 @@ export default function ReservationPage() {
     }
   ];
 
-  const services = [
+  // Mock services data (fallback)
+  const mockServices = [
     { 
       id: '1', 
       name: 'Bebek Koltuğu', 
@@ -312,7 +389,7 @@ export default function ReservationPage() {
             {/* Step Content */}
             <AnimatePresence mode="wait">
               {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} />}
-              {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
+              {currentStep === 2 && <VehicleStep key="vehicle" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => setCurrentStep(1)} />}
               {currentStep === 3 && <CustomerInfoStep key="customer" onNext={handleCustomerNext} onBack={() => setCurrentStep(2)} />}
               {currentStep === 4 && <ConfirmationStep key="confirmation" reservationData={reservationData} qrCode={qrCode} />}
             </AnimatePresence>
@@ -533,10 +610,10 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 }
 
 // Vehicle Step Component
-function VehicleStep({ vehicles, services, onNext, onBack }: any) {
+function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const distance = 25; // Mock distance
+  const distance = reservationData?.distance || 25; // Use real distance from Google Maps, fallback to 25km
 
   const getPrice = (vehicle: any) => vehicle.pricePerKm * distance;
 
@@ -587,8 +664,18 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
     >
       <div className="text-center">
         <h2 className="text-3xl font-bold text-white mb-3">Araç & Fiyat Seçimi</h2>
-        <p className="text-white/70 text-lg">Size uygun lüks aracı seçin (Tahmini mesafe: {distance} km)</p>
+        <p className="text-white/70 text-lg">Size uygun lüks aracı seçin (Mesafe: {distance} km{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''})</p>
       </div>
+
+      {/* Route Visualization */}
+      {reservationData?.from && reservationData?.to && (
+        <RouteVisualization 
+          origin={reservationData.from}
+          destination={reservationData.to}
+          distance={distance}
+          duration={reservationData.estimatedDuration}
+        />
+      )}
 
       {/* Vehicle Selection */}
       <div className="space-y-6">
@@ -596,7 +683,19 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
           <Car className="h-6 w-6" />
           <span>Premium Araç Seçimi</span>
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {loadingVehicles ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <span className="ml-3 text-white">Araçlar yükleniyor...</span>
+          </div>
+        ) : vehicles.length === 0 ? (
+          <div className="text-center py-12">
+            <Car className="h-12 w-12 text-white/60 mx-auto mb-4" />
+            <p className="text-white/70">Şu anda müsait araç bulunmamaktadır.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {vehicles.map((vehicle: any) => (
             <motion.div
               key={vehicle.id}
@@ -656,7 +755,8 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
               </div>
             </motion.div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Additional Services */}
@@ -670,7 +770,19 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
             <Sparkles className="h-6 w-6" />
             <span>Ek Premium Hizmetler</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {loadingServices ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              <span className="ml-3 text-white">Hizmetler yükleniyor...</span>
+            </div>
+          ) : services.length === 0 ? (
+            <div className="text-center py-8">
+              <Sparkles className="h-8 w-8 text-white/60 mx-auto mb-3" />
+              <p className="text-white/70">Şu anda ek hizmet bulunmamaktadır.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {services.map((service: any) => (
               <motion.div
                 key={service.id}
@@ -702,7 +814,8 @@ function VehicleStep({ vehicles, services, onNext, onBack }: any) {
                 </div>
               </motion.div>
             ))}
-          </div>
+            </div>
+          )}
         </motion.div>
       )}
 
