@@ -61,10 +61,18 @@ export default function ReservationPage() {
       // Load vehicles from admin panel
       const vehiclesData = await vehicleService.getAll();
       const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
-      setVehicles(activeVehicles.map(vehicle => ({
+      const processedVehicles = activeVehicles.map(vehicle => ({
         ...vehicle,
         gradient: getVehicleGradient(vehicle.type || 'sedan')
-      })));
+      }));
+      
+      // Use mock data if no vehicles are found
+      if (processedVehicles.length === 0) {
+        console.log('No vehicles found in database, using mock data');
+        setVehicles(mockVehicles);
+      } else {
+        setVehicles(processedVehicles);
+      }
     } catch (error) {
       console.error('Error loading vehicles:', error);
       // Fallback to mock data
@@ -77,11 +85,19 @@ export default function ReservationPage() {
       // Load services from admin panel
       const servicesData = await serviceService.getAll();
       const activeServices = servicesData.filter(service => service.isActive !== false);
-      setServices(activeServices.map(service => ({
+      const processedServices = activeServices.map(service => ({
         ...service,
         icon: getServiceIcon(service.category || 'extra'),
         gradient: getServiceGradient(service.category || 'extra')
-      })));
+      }));
+      
+      // Use mock data if no services are found
+      if (processedServices.length === 0) {
+        console.log('No services found in database, using mock data');
+        setServices(mockServices);
+      } else {
+        setServices(processedServices);
+      }
     } catch (error) {
       console.error('Error loading services:', error);
       // Fallback to mock data
@@ -430,12 +446,6 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
   });
 
   const [hotelPlace, setHotelPlace] = useState<google.maps.places.PlaceResult | undefined>();
-  const [routeData, setRouteData] = useState<{
-    distance: number;
-    duration: number;
-    distanceText: string;
-    durationText: string;
-  } | null>(null);
 
   const getFromLocation = () => {
     return formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
@@ -450,25 +460,17 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
     setHotelPlace(place);
   };
 
-  const handleRouteCalculated = (result: {
-    distance: number;
-    duration: number;
-    distanceText: string;
-    durationText: string;
-  }) => {
-    setRouteData(result);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Set from/to based on direction and hotel location
+    // Distance will be calculated in step 2 with actual Google Maps
     const submitData = {
       ...formData,
       from: getFromLocation(),
       to: getToLocation(),
-      distance: routeData?.distance || 25, // Use Google Maps distance or fallback
-      estimatedDuration: routeData?.durationText || '30 dakika',
+      distance: 25, // Estimated distance in km for Antalya area
+      estimatedDuration: '30 dakika', // Estimated duration
       hotelPlace: hotelPlace
     };
     
@@ -566,16 +568,40 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
           />
         </div>
 
-        {/* Google Maps Route Display */}
+        {/* Route Preview (No map calculation in step 1) */}
         {formData.hotelLocation && (
           <div className="space-y-4">
-            <HybridRouteDisplay
-              origin={getFromLocation()}
-              destination={getToLocation()}
-              originPlace={formData.direction === 'hotel-to-airport' ? hotelPlace : undefined}
-              destinationPlace={formData.direction === 'airport-to-hotel' ? hotelPlace : undefined}
-              onRouteCalculated={handleRouteCalculated}
-            />
+            <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6">
+              <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
+                <Navigation className="h-6 w-6" />
+                <span>Seçilen Güzergah</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-start space-x-3">
+                  <div className="bg-green-500 p-2 rounded-lg flex-shrink-0">
+                    <MapPin className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white/70">Başlangıç</p>
+                    <p className="text-white font-medium">{getFromLocation()}</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="bg-red-500 p-2 rounded-lg flex-shrink-0">
+                    <MapPin className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white/70">Varış</p>
+                    <p className="text-white font-medium">{getToLocation()}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 bg-blue-500/20 border border-blue-500/50 rounded-xl p-3">
+                <p className="text-blue-200 text-sm text-center">
+                  🗺️ Detaylı rota ve harita bir sonraki adımda gösterilecek
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -663,7 +689,24 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const distance = reservationData?.distance || 25; // Use real distance from Google Maps, fallback to 25km
+  const [actualDistance, setActualDistance] = useState(reservationData?.distance || 25);
+  const [routeCalculated, setRouteCalculated] = useState(false);
+  
+  // Use actual calculated distance or fallback to estimated distance
+  const distance = actualDistance;
+
+  // Handle route calculation from Google Maps
+  const handleRouteCalculated = (result: {
+    distance: number;
+    duration: number;
+    distanceText: string;
+    durationText: string;
+  }) => {
+    // Convert distance from meters to kilometers
+    const distanceInKm = Math.round(result.distance / 1000);
+    setActualDistance(distanceInKm);
+    setRouteCalculated(true);
+  };
 
   // Filter vehicles based on passenger and baggage capacity
   const getFilteredVehicles = () => {
@@ -733,12 +776,22 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
 
       {/* Route Information */}
       {reservationData?.from && reservationData?.to && (
-        <HybridRouteDisplay 
-          origin={reservationData.from}
-          destination={reservationData.to}
-          originPlace={reservationData.direction === 'hotel-to-airport' ? reservationData.hotelPlace : undefined}
-          destinationPlace={reservationData.direction === 'airport-to-hotel' ? reservationData.hotelPlace : undefined}
-        />
+        <div className="space-y-4">
+          <HybridRouteDisplay 
+            origin={reservationData.from}
+            destination={reservationData.to}
+            originPlace={reservationData.direction === 'hotel-to-airport' ? reservationData.hotelPlace : undefined}
+            destinationPlace={reservationData.direction === 'airport-to-hotel' ? reservationData.hotelPlace : undefined}
+            onRouteCalculated={handleRouteCalculated}
+          />
+          {routeCalculated && (
+            <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-3">
+              <p className="text-green-200 text-sm text-center">
+                ✅ Gerçek mesafe hesaplandı: {distance} km
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Vehicle Selection */}
