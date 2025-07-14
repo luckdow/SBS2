@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Search } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMaps';
+import { loadGoogleMapsAPI } from '../../lib/googleMapsLoader';
 
 interface AddressAutocompleteProps {
   value: string;
@@ -20,8 +21,25 @@ export default function AddressAutocomplete({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
+
+  // Load Google Maps API on component mount
+  useEffect(() => {
+    const initializeGoogleMaps = async () => {
+      try {
+        await loadGoogleMapsAPI();
+        setGoogleMapsLoaded(true);
+        console.log('🗺️ Google Maps API loaded for autocomplete');
+      } catch (error) {
+        console.warn('🗺️ Google Maps API failed to load, fallback suggestions will be used:', error);
+        setGoogleMapsLoaded(false);
+      }
+    };
+
+    initializeGoogleMaps();
+  }, []);
 
   useEffect(() => {
     if (value.length > 2) {
@@ -78,7 +96,7 @@ export default function AddressAutocomplete({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [value]);
+  }, [value, googleMapsLoaded]);
 
   const handleSuggestionClick = (suggestion: string) => {
     onChange(suggestion);

@@ -253,6 +253,21 @@ export default function RouteVisualization({ origin, destination, distance, dura
             </div>
           </div>
         )}
+
+        {/* API Status Info */}
+        {!GoogleMapsService.isConfigured() && (
+          <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-4">
+            <div className="flex items-center space-x-2">
+              <Route className="h-5 w-5 text-yellow-400" />
+              <div>
+                <p className="text-yellow-200 font-medium text-sm">Google Maps API Yapılandırması Gerekli</p>
+                <p className="text-yellow-200/80 text-xs mt-1">
+                  Harita görünümü için Google Maps API anahtarının .env.local dosyasında yapılandırılması gerekiyor.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
