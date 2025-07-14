@@ -36,6 +36,7 @@ import { vehicleService, serviceService } from '../../lib/services/api';
 import HybridAddressInput from '../../components/ui/HybridAddressInput';
 import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import PaymentStep from '../../components/ui/PaymentStep';
+import ErrorBoundary, { StepErrorBoundary } from '../../components/ui/ErrorBoundary';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -49,19 +50,24 @@ export default function ReservationPage() {
 
   const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
 
-  // Safe step transition with debouncing to prevent Google Maps DOM conflicts
+  // Enhanced safe step transition with better debouncing and DOM stability checks
   const safeSetCurrentStep = React.useCallback((newStep: number) => {
     if (isTransitioning) return;
     
     setIsTransitioning(true);
     
-    // Small delay to allow current components to cleanup properly
+    // Enhanced delay to allow current components to cleanup properly
+    // Increased delay specifically for Google Maps cleanup
     setTimeout(() => {
+      if (!isTransitioning) return; // Double-check we weren't cancelled
+      
       setCurrentStep(newStep);
+      
+      // Enhanced delay for new step initialization, especially for Google Maps
       setTimeout(() => {
         setIsTransitioning(false);
-      }, 300); // Allow new step to initialize
-    }, 100);
+      }, 500); // Increased from 300ms to 500ms for better stability
+    }, 200); // Increased from 100ms to 200ms for better cleanup
   }, [isTransitioning]);
 
   // Load vehicles and services when component mounts
@@ -435,28 +441,78 @@ export default function ReservationPage() {
               </div>
             </div>
 
-            {/* Step Content with Enhanced AnimatePresence */}
-            <AnimatePresence mode="wait" initial={false}>
-              {currentStep === 1 && <RouteStep key="route-step-1" onNext={handleRouteNext} disabled={isTransitioning} />}
-              {currentStep === 2 && <VehicleStep key="vehicle-step-2" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => safeSetCurrentStep(1)} disabled={isTransitioning} />}
-              {currentStep === 3 && <CustomerInfoStep key="customer-step-3" onNext={handleCustomerNext} onBack={() => safeSetCurrentStep(2)} disabled={isTransitioning} />}
-              {currentStep === 4 && <PaymentStep key="payment-step-4" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => safeSetCurrentStep(3)} disabled={isTransitioning} />}
-              {currentStep === 5 && <ConfirmationStep key="confirmation-step-5" reservationData={reservationData} qrCode={qrCode} />}
+            {/* Enhanced Step Content with Error Boundaries and Improved AnimatePresence */}
+            <AnimatePresence 
+              mode="wait" 
+              initial={false}
+              onExitComplete={() => {
+                // Add small delay after exit animation completes to ensure DOM cleanup
+                setTimeout(() => {
+                  console.log('Step exit animation completed');
+                }, 50);
+              }}
+            >
+              {currentStep === 1 && (
+                <StepErrorBoundary stepName="route-step" key="route-step-1">
+                  <RouteStep onNext={handleRouteNext} disabled={isTransitioning} />
+                </StepErrorBoundary>
+              )}
+              {currentStep === 2 && (
+                <StepErrorBoundary stepName="vehicle-step" key="vehicle-step-2">
+                  <VehicleStep 
+                    vehicles={vehicles} 
+                    services={services} 
+                    reservationData={reservationData} 
+                    loadingVehicles={loadingVehicles} 
+                    loadingServices={loadingServices} 
+                    onNext={handleVehicleNext} 
+                    onBack={() => safeSetCurrentStep(1)} 
+                    disabled={isTransitioning} 
+                  />
+                </StepErrorBoundary>
+              )}
+              {currentStep === 3 && (
+                <StepErrorBoundary stepName="customer-step" key="customer-step-3">
+                  <CustomerInfoStep 
+                    onNext={handleCustomerNext} 
+                    onBack={() => safeSetCurrentStep(2)} 
+                    disabled={isTransitioning} 
+                  />
+                </StepErrorBoundary>
+              )}
+              {currentStep === 4 && (
+                <StepErrorBoundary stepName="payment-step" key="payment-step-4">
+                  <PaymentStep 
+                    reservationData={reservationData} 
+                    onNext={handlePaymentNext} 
+                    onBack={() => safeSetCurrentStep(3)} 
+                    disabled={isTransitioning} 
+                  />
+                </StepErrorBoundary>
+              )}
+              {currentStep === 5 && (
+                <StepErrorBoundary stepName="confirmation-step" key="confirmation-step-5">
+                  <ConfirmationStep reservationData={reservationData} qrCode={qrCode} />
+                </StepErrorBoundary>
+              )}
             </AnimatePresence>
 
-            {/* Transition Loading Overlay */}
+            {/* Enhanced Transition Loading Overlay */}
             {isTransitioning && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 rounded-3xl"
+                className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 rounded-3xl"
               >
                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
                   <div className="flex items-center space-x-3">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                     <span className="text-white font-medium">Adım geçişi...</span>
                   </div>
+                  <p className="text-white/70 text-sm mt-2 text-center">
+                    Google Maps temizleniyor...
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -467,7 +523,7 @@ export default function ReservationPage() {
   );
 }
 
-// Route Step Component
+// Route Step Component  
 function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; disabled?: boolean }) {
   const [formData, setFormData] = useState({
     direction: 'airport-to-hotel',
@@ -514,7 +570,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
     <motion.div
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -50 }}
+      exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >
@@ -765,7 +821,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
     <motion.div
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -50 }}
+      exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >
@@ -1068,7 +1124,7 @@ function CustomerInfoStep({ onNext, onBack, disabled = false }: any) {
     <motion.div
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -50 }}
+      exit={{ opacity: 0, x: -50, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="space-y-8"
     >

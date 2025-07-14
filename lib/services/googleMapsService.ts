@@ -385,23 +385,56 @@ export class GoogleMapsService {
 
   // Utility methods for safe DOM operations and cleanup
   static safeElementCheck(element: HTMLElement | null): boolean {
-    return element !== null && element.isConnected && document.contains(element);
+    try {
+      return element !== null && 
+             element.isConnected && 
+             document.contains(element) &&
+             element.parentNode !== null;
+    } catch (error) {
+      // If any check throws, element is not safe
+      return false;
+    }
+  }
+
+  // Enhanced element safety check with retries for race conditions
+  static async safeElementCheckAsync(element: HTMLElement | null, retries = 3): Promise<boolean> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        if (this.safeElementCheck(element)) {
+          return true;
+        }
+        // Small delay to handle race conditions
+        await new Promise(resolve => setTimeout(resolve, 10));
+      } catch (error) {
+        console.warn(`Element check attempt ${i + 1} failed:`, error);
+      }
+    }
+    return false;
   }
 
   static async safeMapCleanup(map: google.maps.Map | null, directionsRenderer?: google.maps.DirectionsRenderer | null): Promise<void> {
     try {
       if (directionsRenderer) {
         try {
-          // Multiple safety checks before DirectionsRenderer cleanup
+          // Enhanced safety checks before DirectionsRenderer cleanup
           const mapInstance = directionsRenderer.getMap();
           if (mapInstance) {
             const mapDiv = mapInstance.getDiv();
-            // Only proceed if map container still exists and is connected
-            if (this.safeElementCheck(mapDiv)) {
+            // Multiple layers of validation with async safety checks
+            if (await this.safeElementCheckAsync(mapDiv)) {
               // Clear directions first (safer than direct DOM manipulation)
-              directionsRenderer.setDirections({ routes: [] } as any);
+              try {
+                directionsRenderer.setDirections({ routes: [] } as any);
+              } catch (clearError) {
+                console.warn('Could not clear directions:', clearError);
+              }
+              
               // Only set map to null if container is still valid
-              directionsRenderer.setMap(null);
+              try {
+                directionsRenderer.setMap(null);
+              } catch (mapSetError) {
+                console.warn('Could not set renderer map to null:', mapSetError);
+              }
             } else {
               // Map container is gone, just clear the reference
               console.warn('Map container unavailable during DirectionsRenderer cleanup - clearing reference only');
@@ -415,11 +448,20 @@ export class GoogleMapsService {
       
       if (map) {
         try {
-          // Clear map without causing DOM errors
+          // Enhanced map cleanup with async safety checks
           const mapDiv = map.getDiv();
-          if (this.safeElementCheck(mapDiv)) {
+          if (await this.safeElementCheckAsync(mapDiv)) {
             // Google Maps cleanup happens automatically when DOM element is removed
             // We just need to clear references and ensure no pending operations
+            
+            // Clear any pending map operations
+            try {
+              if (map.getProjection) {
+                // Map is still valid, let it clean up naturally
+              }
+            } catch (projectionError) {
+              console.warn('Map projection check failed during cleanup:', projectionError);
+            }
           } else {
             console.warn('Map container unavailable during cleanup - DOM already removed');
           }
@@ -439,28 +481,35 @@ export class GoogleMapsService {
 
       // Handle modern PlaceAutocompleteElement
       if ('remove' in autocomplete && typeof autocomplete.remove === 'function') {
-        // Multiple checks to ensure safe removal
-        if (autocomplete.isConnected && autocomplete.parentNode) {
+        // Enhanced safety checks for modern element removal
+        if (await this.safeElementCheckAsync(autocomplete as HTMLElement)) {
           try {
             // Try using remove() first (modern approach)
             autocomplete.remove();
           } catch (removeError) {
             // Fallback to parentNode.removeChild if remove() fails
             try {
-              if (autocomplete.parentNode && autocomplete.parentNode.contains(autocomplete)) {
-                autocomplete.parentNode.removeChild(autocomplete);
+              const parent = (autocomplete as HTMLElement).parentNode;
+              if (parent && 
+                  parent.contains(autocomplete as HTMLElement) && 
+                  await this.safeElementCheckAsync(parent as HTMLElement)) {
+                parent.removeChild(autocomplete as HTMLElement);
               }
             } catch (parentRemoveError) {
               console.warn('Could not remove autocomplete element via parent:', parentRemoveError);
             }
           }
+        } else {
+          console.warn('Autocomplete element not safe for removal - skipping DOM manipulation');
         }
         return;
       }
 
-      // Handle legacy Autocomplete
+      // Handle legacy Autocomplete with enhanced safety
       if (typeof window !== 'undefined' && window.google?.maps?.event) {
         try {
+          // Add small delay to ensure any pending operations complete
+          await new Promise(resolve => setTimeout(resolve, 50));
           window.google.maps.event.clearInstanceListeners(autocomplete);
         } catch (clearError) {
           console.warn('Could not clear autocomplete listeners:', clearError);
@@ -478,15 +527,43 @@ export class GoogleMapsService {
     const checks = [
       () => this.safeElementCheck(element),
       () => new Promise(resolve => setTimeout(() => resolve(this.safeElementCheck(element)), 5)),
-      () => new Promise(resolve => setTimeout(() => resolve(this.safeElementCheck(element)), 10))
+      () => new Promise(resolve => setTimeout(() => resolve(this.safeElementCheck(element)), 10)),
+      () => new Promise(resolve => setTimeout(() => resolve(this.safeElementCheck(element)), 25))
     ];
 
     for (let i = 0; i < checks.length; i++) {
-      const isValid = await checks[i]();
-      if (!isValid) {
-        throw new Error(`${operationName}: Element became unavailable during async operation (check ${i + 1})`);
+      try {
+        const isValid = await checks[i]();
+        if (!isValid) {
+          throw new Error(`${operationName}: Element became unavailable during async operation (check ${i + 1})`);
+        }
+      } catch (error) {
+        // On final check, throw the error
+        if (i === checks.length - 1) {
+          throw error;
+        }
+        // Otherwise, continue to next check
+        console.warn(`${operationName}: Element check ${i + 1} failed, retrying...`);
       }
     }
+  }
+
+  // Additional utility for waiting for DOM stability
+  static async waitForDOMStability(element: HTMLElement, timeout = 1000): Promise<boolean> {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      if (await this.safeElementCheckAsync(element)) {
+        // Element is stable, wait a bit more to ensure it stays stable
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (await this.safeElementCheckAsync(element)) {
+          return true;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    return false;
   }
 }
 

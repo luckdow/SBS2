@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Navigation, Clock, Route, AlertCircle, Loader2 } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
+import ErrorBoundary from './ErrorBoundary';
 
 interface HybridRouteDisplayProps {
   origin: string;
@@ -34,20 +35,30 @@ export default function HybridRouteDisplay({
   const [errorMessage, setErrorMessage] = useState('');
   const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
 
-  // Cleanup function to prevent DOM manipulation errors
-  const cleanup = useCallback(() => {
+  // Enhanced cleanup function to prevent DOM manipulation errors
+  const cleanup = useCallback(async () => {
     try {
-      // Enhanced safety checks with additional validation
+      // Enhanced safety checks with additional validation and delays
       if (directionsRendererRef.current) {
         try {
           // Check if map container is still valid before cleanup
-          if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
+          if (mapInstanceRef.current && mapRef.current) {
             const mapDiv = mapInstanceRef.current.getDiv();
-            // Additional check: ensure map div is still connected and our ref matches
-            if (GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
-              // Only attempt cleanup if all elements are still properly connected
-              directionsRendererRef.current.setDirections({ routes: [] } as any);
-              directionsRendererRef.current.setMap(null);
+            // Enhanced validation with async safety checks
+            if (await GoogleMapsService.safeElementCheckAsync(mapDiv) && mapDiv === mapRef.current) {
+              // Wait for any pending operations to complete
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Final safety check before cleanup
+              if (await GoogleMapsService.safeElementCheckAsync(mapDiv) && 
+                  mapDiv === mapRef.current && 
+                  isMountedRef.current) {
+                // Only attempt cleanup if all elements are still properly connected
+                directionsRendererRef.current.setDirections({ routes: [] } as any);
+                directionsRendererRef.current.setMap(null);
+              } else {
+                console.warn('Map container state changed during cleanup - skipping DirectionsRenderer cleanup');
+              }
             } else {
               console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
             }
@@ -64,7 +75,7 @@ export default function HybridRouteDisplay({
         try {
           const mapDiv = mapInstanceRef.current.getDiv();
           // Only validate if the map container matches our reference and is still connected
-          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
+          if (mapDiv && await GoogleMapsService.safeElementCheckAsync(mapDiv) && mapDiv === mapRef.current) {
             // Google Maps cleanup happens automatically when DOM element is removed
             // Just clear our reference to prevent memory leaks
           } else {
@@ -89,8 +100,10 @@ export default function HybridRouteDisplay({
       isMountedRef.current = false;
       // Signal any pending operations to abort
       abortController.abort();
-      // Clean up Google Maps elements
-      cleanup();
+      // Clean up Google Maps elements with async safety
+      cleanup().catch(error => {
+        console.warn('Cleanup failed during unmount:', error);
+      });
     };
   }, [cleanup]);
 
@@ -108,15 +121,253 @@ export default function HybridRouteDisplay({
         return;
       }
 
-      // Clean up previous instances
-      cleanup();
+      // Clean up previous instances with enhanced safety
+      await cleanup();
 
       setStatus('loading');
       setRouteInfo(null);
 
       try {
-        // Validate element before async operation
+        // Validate element before async operation with enhanced checks
         await GoogleMapsService.validateElementDuringAsync(mapRef.current, 'Map initialization');
+        
+        // Wait for DOM stability
+        const isStable = await GoogleMapsService.waitForDOMStability(mapRef.current, 2000);
+        if (!isStable) {
+          throw new Error('Map container did not stabilize within timeout');
+        }
+        
+        // Haritayı ve rota çiziciyi oluştur
+        const google = await GoogleMapsService.loadGoogleMaps();
+        
+        // Double-check map container still exists after async operation
+        if (!mapRef.current || !GoogleMapsService.safeElementCheck(mapRef.current)) {
+          throw new Error('Map container became unavailable during initialization');
+        }
+        
+        const map = new google.maps.Map(mapRef.current, {
+          zoom: 10,
+          center: { lat: 36.8969, lng: 30.7133 }, // Antalya
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+        });
+        
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+            polylineOptions: { strokeColor: '#3B82F6', strokeWeight: 4 }
+        });
+        
+        // Store references for cleanup
+        mapInstanceRef.current = map;
+        directionsRendererRef.current = directionsRenderer;
+        
+        directionsRenderer.setMap(map);
+
+        // Rotayı hesapla
+        const result = await GoogleMapsService.getDirections(
+          originPlace?.geometry?.location || origin,
+          destinationPlace?.geometry?.location || destination
+        );
+        
+        // Final safety check before setting directions - validate all elements still exist
+        if (directionsRenderer && 
+            mapRef.current && 
+            GoogleMapsService.safeElementCheck(mapRef.current) &&
+            mapInstanceRef.current &&
+            directionsRendererRef.current === directionsRenderer &&
+            isMountedRef.current) { // Check component is still mounted
+          directionsRenderer.setDirections(result);
+        } else {
+          console.warn('Component unmounted or invalid during route calculation - skipping direction display');
+          return;
+        }
+
+        // Bilgileri ayarla ve state'i güncelle
+        const leg = result.routes[0].legs[0];
+        const routeData = {
+          distance: leg.distance?.value || 0,
+          duration: leg.duration?.value || 0,
+          distanceText: leg.distance?.text || '',
+          durationText: leg.duration?.text || '',
+        };
+
+        // Final check before updating state - ensure component is still mounted
+        if (mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current) && isMountedRef.current) {
+          setRouteInfo({ distanceText: routeData.distanceText, durationText: routeData.durationText });
+          onRouteCalculated?.(routeData);
+          setStatus('success');
+        } else {
+          console.warn('Component unmounted during route processing - skipping state update');
+        }
+
+      } catch (error) {
+        // Only set error state if component is still mounted
+        if (mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current) && isMountedRef.current) {
+          const msg = error instanceof Error
+            ? `Rota hesaplanamadı: ${error.message}`
+            : 'Bilinmeyen bir harita hatası oluştu.';
+          setErrorMessage(msg);
+          setStatus('error');
+          console.error('Google Maps Route Error:', msg);
+        } else {
+          console.warn('Component unmounted during error handling - skipping error display');
+        }
+      }
+    };
+
+    calculateAndDisplayRoute();
+
+  }, [origin, destination, originPlace, destinationPlace, onRouteCalculated, cleanup]);
+
+  if (!origin || !destination) {
+    return (
+      <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6">
+        <div className="text-center py-8">
+          <Route className="h-12 w-12 text-white/60 mx-auto mb-3" />
+          <p className="text-white/70">Rota göstermek için başlangıç ve varış noktalarını seçin.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary
+      onError={(error) => {
+        console.error('HybridRouteDisplay Error:', error);
+        // Clean up on error
+        cleanup().catch(console.warn);
+      }}
+      resetKeys={[origin, destination]}
+      resetOnPropsChange={true}
+    >
+      <RouteDisplayContent 
+        origin={origin}
+        destination={destination}
+        originPlace={originPlace}
+        destinationPlace={destinationPlace}
+        onRouteCalculated={onRouteCalculated}
+      />
+    </ErrorBoundary>
+  );
+}
+
+// Separate the main content to isolate error boundary
+function RouteDisplayContent({
+  origin,
+  destination,
+  originPlace,
+  destinationPlace,
+  onRouteCalculated,
+}: HybridRouteDisplayProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const isMountedRef = useRef(true); // Track component mount state
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
+
+  // Enhanced cleanup function to prevent DOM manipulation errors
+  const cleanup = useCallback(async () => {
+    try {
+      // Enhanced safety checks with additional validation and delays
+      if (directionsRendererRef.current) {
+        try {
+          // Check if map container is still valid before cleanup
+          if (mapInstanceRef.current && mapRef.current) {
+            const mapDiv = mapInstanceRef.current.getDiv();
+            // Enhanced validation with async safety checks
+            if (await GoogleMapsService.safeElementCheckAsync(mapDiv) && mapDiv === mapRef.current) {
+              // Wait for any pending operations to complete
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Final safety check before cleanup
+              if (await GoogleMapsService.safeElementCheckAsync(mapDiv) && 
+                  mapDiv === mapRef.current && 
+                  isMountedRef.current) {
+                // Only attempt cleanup if all elements are still properly connected
+                directionsRendererRef.current.setDirections({ routes: [] } as any);
+                directionsRendererRef.current.setMap(null);
+              } else {
+                console.warn('Map container state changed during cleanup - skipping DirectionsRenderer cleanup');
+              }
+            } else {
+              console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
+            }
+          } else {
+            console.warn('Map instance or container unavailable during cleanup - skipping DirectionsRenderer cleanup');
+          }
+        } catch (rendererError) {
+          console.warn('DirectionsRenderer cleanup warning (non-critical):', rendererError);
+        }
+        directionsRendererRef.current = null;
+      }
+
+      if (mapInstanceRef.current) {
+        try {
+          const mapDiv = mapInstanceRef.current.getDiv();
+          // Only validate if the map container matches our reference and is still connected
+          if (mapDiv && await GoogleMapsService.safeElementCheckAsync(mapDiv) && mapDiv === mapRef.current) {
+            // Google Maps cleanup happens automatically when DOM element is removed
+            // Just clear our reference to prevent memory leaks
+          } else {
+            console.warn('Map div unavailable or mismatched during cleanup');
+          }
+        } catch (mapError) {
+          console.warn('Map cleanup warning (non-critical):', mapError);
+        }
+        mapInstanceRef.current = null;
+      }
+    } catch (error) {
+      console.warn('Route cleanup warning (non-critical):', error);
+    }
+  }, []);
+
+  // Enhanced cleanup on unmount with abort controller for pending operations
+  useEffect(() => {
+    const abortController = new AbortController();
+    
+    return () => {
+      // Mark component as unmounted to prevent further DOM operations
+      isMountedRef.current = false;
+      // Signal any pending operations to abort
+      abortController.abort();
+      // Clean up Google Maps elements with async safety
+      cleanup().catch(error => {
+        console.warn('Cleanup failed during unmount:', error);
+      });
+    };
+  }, [cleanup]);
+
+  useEffect(() => {
+    if (!origin || !destination) {
+      return;
+    }
+
+    const calculateAndDisplayRoute = async () => {
+      // Validate map container exists before proceeding
+      if (!mapRef.current) {
+        console.warn('Map container not found');
+        setErrorMessage('Harita konteyneri bulunamadı');
+        setStatus('error');
+        return;
+      }
+
+      // Clean up previous instances with enhanced safety
+      await cleanup();
+
+      setStatus('loading');
+      setRouteInfo(null);
+
+      try {
+        // Validate element before async operation with enhanced checks
+        await GoogleMapsService.validateElementDuringAsync(mapRef.current, 'Map initialization');
+        
+        // Wait for DOM stability
+        const isStable = await GoogleMapsService.waitForDOMStability(mapRef.current, 2000);
+        if (!isStable) {
+          throw new Error('Map container did not stabilize within timeout');
+        }
         
         // Haritayı ve rota çiziciyi oluştur
         const google = await GoogleMapsService.loadGoogleMaps();

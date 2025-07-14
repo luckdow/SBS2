@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, AlertCircle, Loader2 } from 'lucide-react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
+import ErrorBoundary from './ErrorBoundary';
 
 interface GoogleMapsAutocompleteProps {
   value: string;
@@ -62,8 +63,14 @@ export default function GoogleMapsAutocomplete({
     onStatusChange?.('loading');
 
     try {
-      // Validate container element
+      // Enhanced element validation with better error handling
       await GoogleMapsService.validateElementDuringAsync(containerRef.current, 'Autocomplete initialization');
+
+      // Wait for DOM stability before proceeding
+      const isStable = await GoogleMapsService.waitForDOMStability(containerRef.current, 1000);
+      if (!isStable) {
+        throw new Error('Container element did not stabilize within timeout');
+      }
 
       const result = await GoogleMapsService.createBestAutocomplete(containerRef.current, {
         componentRestrictions: { country: ['tr'] },
@@ -71,7 +78,7 @@ export default function GoogleMapsAutocomplete({
         placeholder: placeholder
       });
 
-      // Double-check component is still mounted
+      // Double-check component is still mounted after async operations
       if (!isMountedRef.current) {
         await GoogleMapsService.safeAutocompleteCleanup(result.element);
         return;
@@ -80,38 +87,50 @@ export default function GoogleMapsAutocomplete({
       autocompleteRef.current = result.element;
       autocompleteTypeRef.current = result.type;
 
-      // Setup event listeners based on autocomplete type
+      // Setup event listeners based on autocomplete type with enhanced safety
       if (result.type === 'modern') {
         const modernElement = result.element as google.maps.places.PlaceAutocompleteElement;
         
-        // Safely add to container if it's not already there
-        if (containerRef.current && !containerRef.current.contains(modernElement)) {
+        // Enhanced safety checks for adding to container
+        if (containerRef.current && await GoogleMapsService.safeElementCheckAsync(containerRef.current)) {
           try {
             // Hide the fallback input when modern element is active
             if (inputRef.current) {
               inputRef.current.style.display = 'none';
             }
             
-            // Clear existing content safely before adding new element
-            while (containerRef.current.firstChild && containerRef.current.firstChild !== inputRef.current) {
-              try {
-                const child = containerRef.current.firstChild;
-                if (child.parentNode === containerRef.current) {
-                  containerRef.current.removeChild(child);
+            // Enhanced container cleanup before adding new element
+            if (!containerRef.current.contains(modernElement)) {
+              // Clear existing content safely before adding new element
+              const childrenToRemove = Array.from(containerRef.current.children).filter(
+                child => child !== inputRef.current
+              );
+              
+              for (const child of childrenToRemove) {
+                try {
+                  if (child.parentNode === containerRef.current) {
+                    containerRef.current.removeChild(child);
+                  }
+                } catch (removeError) {
+                  console.warn('Could not remove child element:', removeError);
                 }
-              } catch (removeError) {
-                console.warn('Could not remove child element:', removeError);
-                break;
+              }
+              
+              // Final safety check before appending
+              if (await GoogleMapsService.safeElementCheckAsync(containerRef.current)) {
+                containerRef.current.appendChild(modernElement);
+              } else {
+                throw new Error('Container became unavailable during element addition');
               }
             }
-            
-            containerRef.current.appendChild(modernElement);
           } catch (appendError) {
             console.warn('Could not append modern autocomplete element:', appendError);
             // Fallback to legacy if modern element can't be added
             await GoogleMapsService.safeAutocompleteCleanup(modernElement);
             throw new Error('Failed to add modern autocomplete element to container');
           }
+        } else {
+          throw new Error('Container element became unavailable during modern element setup');
         }
         
         modernElement.addEventListener('gmp-placeselect', (event: any) => {
@@ -172,14 +191,19 @@ export default function GoogleMapsAutocomplete({
     };
   }, [initializeAutocomplete]);
 
-  // Cleanup autocomplete on unmount
+  // Enhanced cleanup autocomplete on unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       if (autocompleteRef.current) {
-        GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
-        autocompleteRef.current = null;
-        autocompleteTypeRef.current = null;
+        GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current).then(() => {
+          autocompleteRef.current = null;
+          autocompleteTypeRef.current = null;
+        }).catch(error => {
+          console.warn('Autocomplete cleanup failed during unmount:', error);
+          autocompleteRef.current = null;
+          autocompleteTypeRef.current = null;
+        });
       }
     };
   }, []);
@@ -201,11 +225,270 @@ export default function GoogleMapsAutocomplete({
     setError('');
     setIsInitialized(false);
     if (autocompleteRef.current) {
-      GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
-      autocompleteRef.current = null;
-      autocompleteTypeRef.current = null;
+      GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current).then(() => {
+        autocompleteRef.current = null;
+        autocompleteTypeRef.current = null;
+        initializeAutocomplete();
+      }).catch(error => {
+        console.warn('Retry cleanup failed:', error);
+        autocompleteRef.current = null;
+        autocompleteTypeRef.current = null;
+        initializeAutocomplete();
+      });
+    } else {
+      initializeAutocomplete();
     }
-    initializeAutocomplete();
+  };
+
+  return (
+    <ErrorBoundary
+      onError={(error) => {
+        console.error('GoogleMapsAutocomplete Error:', error);
+        // Clean up on error
+        if (autocompleteRef.current) {
+          GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current).catch(console.warn);
+        }
+      }}
+      resetKeys={[value, placeholder]}
+      resetOnPropsChange={true}
+    >
+      <AutocompleteContent 
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={className}
+        onError={onError}
+        onStatusChange={onStatusChange}
+      />
+    </ErrorBoundary>
+  );
+}
+
+// Separate the main content to isolate error boundary
+function AutocompleteContent({ 
+  value, 
+  onChange, 
+  placeholder, 
+  className = '',
+  onError,
+  onStatusChange
+}: GoogleMapsAutocompleteProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | google.maps.places.PlaceAutocompleteElement | null>(null);
+  const autocompleteTypeRef = useRef<'modern' | 'legacy' | null>(null);
+  const isMountedRef = useRef(true);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const handleError = useCallback((errorMessage: string) => {
+    if (!isMountedRef.current) return;
+    
+    setError(errorMessage);
+    onError?.(errorMessage);
+    onStatusChange?.('error', errorMessage);
+    console.error('Google Maps Autocomplete Error:', errorMessage);
+  }, [onError, onStatusChange]);
+
+  const handlePlaceSelect = useCallback((place: google.maps.places.PlaceResult) => {
+    if (!isMountedRef.current) return;
+    
+    if (!place.geometry || !place.geometry.location) {
+      handleError('Seçilen konum için detaylı bilgi bulunamadı.');
+      return;
+    }
+
+    const address = place.formatted_address || place.name || '';
+    onChange(address, place);
+  }, [onChange, handleError]);
+
+  const initializeAutocomplete = useCallback(async () => {
+    if (!isMountedRef.current || !containerRef.current || autocompleteRef.current || isInitialized) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    onStatusChange?.('loading');
+
+    try {
+      // Enhanced element validation with better error handling
+      await GoogleMapsService.validateElementDuringAsync(containerRef.current, 'Autocomplete initialization');
+
+      // Wait for DOM stability before proceeding
+      const isStable = await GoogleMapsService.waitForDOMStability(containerRef.current, 1000);
+      if (!isStable) {
+        throw new Error('Container element did not stabilize within timeout');
+      }
+
+      const result = await GoogleMapsService.createBestAutocomplete(containerRef.current, {
+        componentRestrictions: { country: ['tr'] },
+        types: ['establishment', 'geocode'],
+        placeholder: placeholder
+      });
+
+      // Double-check component is still mounted after async operations
+      if (!isMountedRef.current) {
+        await GoogleMapsService.safeAutocompleteCleanup(result.element);
+        return;
+      }
+
+      autocompleteRef.current = result.element;
+      autocompleteTypeRef.current = result.type;
+
+      // Setup event listeners based on autocomplete type with enhanced safety
+      if (result.type === 'modern') {
+        const modernElement = result.element as google.maps.places.PlaceAutocompleteElement;
+        
+        // Enhanced safety checks for adding to container
+        if (containerRef.current && await GoogleMapsService.safeElementCheckAsync(containerRef.current)) {
+          try {
+            // Hide the fallback input when modern element is active
+            if (inputRef.current) {
+              inputRef.current.style.display = 'none';
+            }
+            
+            // Enhanced container cleanup before adding new element
+            if (!containerRef.current.contains(modernElement)) {
+              // Clear existing content safely before adding new element
+              const childrenToRemove = Array.from(containerRef.current.children).filter(
+                child => child !== inputRef.current
+              );
+              
+              for (const child of childrenToRemove) {
+                try {
+                  if (child.parentNode === containerRef.current) {
+                    containerRef.current.removeChild(child);
+                  }
+                } catch (removeError) {
+                  console.warn('Could not remove child element:', removeError);
+                }
+              }
+              
+              // Final safety check before appending
+              if (await GoogleMapsService.safeElementCheckAsync(containerRef.current)) {
+                containerRef.current.appendChild(modernElement);
+              } else {
+                throw new Error('Container became unavailable during element addition');
+              }
+            }
+          } catch (appendError) {
+            console.warn('Could not append modern autocomplete element:', appendError);
+            // Fallback to legacy if modern element can't be added
+            await GoogleMapsService.safeAutocompleteCleanup(modernElement);
+            throw new Error('Failed to add modern autocomplete element to container');
+          }
+        } else {
+          throw new Error('Container element became unavailable during modern element setup');
+        }
+        
+        modernElement.addEventListener('gmp-placeselect', (event: any) => {
+          if (!isMountedRef.current) return;
+          const place = event.place;
+          handlePlaceSelect(place);
+        });
+
+        // Note: PlaceAutocompleteElement doesn't support setting initial value
+        // The modern element manages its own input state internally
+        
+      } else {
+        // Legacy autocomplete
+        const legacyAutocomplete = result.element as google.maps.places.Autocomplete;
+        
+        // Show the fallback input for legacy mode
+        if (inputRef.current) {
+          inputRef.current.style.display = 'block';
+        }
+        
+        legacyAutocomplete.addListener('place_changed', () => {
+          if (!isMountedRef.current) return;
+          const place = legacyAutocomplete.getPlace();
+          handlePlaceSelect(place);
+        });
+      }
+
+      if (isMountedRef.current) {
+        setIsInitialized(true);
+        onStatusChange?.('success');
+      }
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      
+      const errorMessage = error instanceof Error 
+        ? `Google Maps yüklenemedi: ${error.message}` 
+        : 'Google Maps servisi kullanılamıyor.';
+      handleError(errorMessage);
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [onChange, handleError, isInitialized, onStatusChange, placeholder, value, handlePlaceSelect]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    const timer = setTimeout(() => {
+      if (isMountedRef.current) {
+        initializeAutocomplete();
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      isMountedRef.current = false;
+    };
+  }, [initializeAutocomplete]);
+
+  // Enhanced cleanup autocomplete on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (autocompleteRef.current) {
+        GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current).then(() => {
+          autocompleteRef.current = null;
+          autocompleteTypeRef.current = null;
+        }).catch(error => {
+          console.warn('Autocomplete cleanup failed during unmount:', error);
+          autocompleteRef.current = null;
+          autocompleteTypeRef.current = null;
+        });
+      }
+    };
+  }, []);
+
+  // Sync input value for legacy autocomplete only
+  useEffect(() => {
+    if (autocompleteTypeRef.current === 'legacy' && inputRef.current && inputRef.current.value !== value) {
+      inputRef.current.value = value;
+    }
+    // Note: Modern PlaceAutocompleteElement manages its own state internally
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+  };
+
+  const handleRetry = () => {
+    setError('');
+    setIsInitialized(false);
+    if (autocompleteRef.current) {
+      GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current).then(() => {
+        autocompleteRef.current = null;
+        autocompleteTypeRef.current = null;
+        initializeAutocomplete();
+      }).catch(error => {
+        console.warn('Retry cleanup failed:', error);
+        autocompleteRef.current = null;
+        autocompleteTypeRef.current = null;
+        initializeAutocomplete();
+      });
+    } else {
+      initializeAutocomplete();
+    }
   };
 
   return (
