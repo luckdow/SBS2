@@ -67,8 +67,8 @@ export default function ReservationPage() {
       })));
     } catch (error) {
       console.error('Error loading vehicles:', error);
-      // Fallback to mock data
-      setVehicles(mockVehicles);
+      // No fallback - keep empty array
+      setVehicles([]);
     } finally {
       setLoadingVehicles(false);
     }
@@ -84,8 +84,8 @@ export default function ReservationPage() {
       })));
     } catch (error) {
       console.error('Error loading services:', error);
-      // Fallback to mock data
-      setServices(mockServices);
+      // No fallback - keep empty array  
+      setServices([]);
     } finally {
       setLoadingServices(false);
     }
@@ -117,79 +117,6 @@ export default function ReservationPage() {
       default: return 'from-green-400 to-green-600';
     }
   };
-
-  // Mock vehicles data (fallback)
-  const mockVehicles = [
-    {
-      id: '1',
-      name: 'Ekonomi Sedan',
-      capacity: 4,
-      baggage: 2,
-      pricePerKm: 8,
-      image: 'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg?auto=compress&cs=tinysrgb&w=400',
-      features: ['Klima', 'Temiz Araç', 'Sigara İçilmez', 'Bluetooth'],
-      rating: 4.2,
-      gradient: 'from-blue-400 to-blue-600'
-    },
-    {
-      id: '2',
-      name: 'Konfor SUV',
-      capacity: 6,
-      baggage: 4,
-      pricePerKm: 12,
-      image: 'https://images.pexels.com/photos/463174/pexels-photo-463174.jpeg?auto=compress&cs=tinysrgb&w=400',
-      features: ['Klima', 'Geniş İç Mekan', 'USB Şarj', 'Wi-Fi', 'Deri Koltuk'],
-      rating: 4.7,
-      gradient: 'from-purple-400 to-purple-600'
-    },
-    {
-      id: '3',
-      name: 'Premium Van',
-      capacity: 8,
-      baggage: 6,
-      pricePerKm: 15,
-      image: 'https://images.pexels.com/photos/1335077/pexels-photo-1335077.jpeg?auto=compress&cs=tinysrgb&w=400',
-      features: ['Klima', 'Deri Koltuk', 'Mini Bar', 'Wi-Fi', 'TV', 'Masaj'],
-      rating: 4.9,
-      gradient: 'from-yellow-400 to-orange-500'
-    }
-  ];
-
-  // Mock services data (fallback)
-  const mockServices = [
-    { 
-      id: '1', 
-      name: 'Bebek Koltuğu', 
-      price: 50, 
-      description: '0-4 yaş arası çocuklar için',
-      icon: Gift,
-      gradient: 'from-pink-400 to-pink-600'
-    },
-    { 
-      id: '2', 
-      name: 'Çocuk Koltuğu', 
-      price: 40, 
-      description: '4-12 yaş arası çocuklar için',
-      icon: Users,
-      gradient: 'from-green-400 to-green-600'
-    },
-    { 
-      id: '3', 
-      name: 'Ek Bagaj', 
-      price: 30, 
-      description: 'Standart üzeri bagaj için',
-      icon: Luggage,
-      gradient: 'from-blue-400 to-blue-600'
-    },
-    { 
-      id: '4', 
-      name: 'Havalimanı Karşılama', 
-      price: 75, 
-      description: 'Tabela ile karşılama hizmeti',
-      icon: Plane,
-      gradient: 'from-purple-400 to-purple-600'
-    }
-  ];
 
   const handleRouteNext = (routeData: any) => {
     setReservationData(prev => ({ 
@@ -467,7 +394,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
       ...formData,
       from: getFromLocation(),
       to: getToLocation(),
-      distance: routeData?.distance || 25, // Use Google Maps distance or fallback
+      distance: routeData?.distance || 25, // Use Google Maps distance or default
       estimatedDuration: routeData?.durationText || '30 dakika',
       hotelPlace: hotelPlace
     };
@@ -663,7 +590,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
 function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const distance = reservationData?.distance || 25; // Use real distance from Google Maps, fallback to 25km
+  const distance = reservationData?.distance || 25; // Use real distance from Google Maps, default to 25km
 
   // Filter vehicles based on passenger and baggage capacity
   const getFilteredVehicles = () => {

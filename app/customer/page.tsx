@@ -51,48 +51,10 @@ export default function CustomerDashboard() {
     avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150'
   };
 
-  // Mock reservations
-  const mockReservations = [
-    {
-      id: 'RES001',
-      from: 'Antalya Havalimanı',
-      to: 'Lara Beach Hotel',
-      date: '2024-01-15',
-      time: '14:30',
-      status: 'completed',
-      driver: 'Mehmet Şoför',
-      vehicle: 'Mercedes E-Class',
-      price: 280,
-      rating: 5,
-      createdAt: new Date('2024-01-15')
-    },
-    {
-      id: 'RES002',
-      from: 'Kemer Marina',
-      to: 'Antalya Havalimanı',
-      date: '2024-01-20',
-      time: '16:00',
-      status: 'started',
-      driver: 'Ali Şoför',
-      vehicle: 'BMW X5',
-      price: 320,
-      createdAt: new Date('2024-01-20')
-    },
-    {
-      id: 'RES003',
-      from: 'Side Antik Tiyatro',
-      to: 'Belek Golf Resort',
-      date: '2024-01-25',
-      time: '18:15',
-      status: 'pending',
-      vehicle: 'Audi A6',
-      price: 180,
-      createdAt: new Date('2024-01-25')
-    }
-  ];
-
   useEffect(() => {
-    setReservations(mockReservations);
+    // Load real reservations from API - no mock data fallback
+    // For now, keep empty array until real API integration
+    setReservations([]);
   }, []);
 
   const getStatusColor = (status: string) => {
