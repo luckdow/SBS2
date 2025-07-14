@@ -72,7 +72,7 @@ export default function HybridAddressInput({
     );
   }
 
-  // Fallback UI
+  // Fallback UI (Sadece hata durumunda gösterilir)
   return (
     <div className="relative">
       <div className="relative">
