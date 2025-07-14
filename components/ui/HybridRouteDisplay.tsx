@@ -35,12 +35,17 @@ export default function HybridRouteDisplay({
 
   // Cleanup function to prevent DOM manipulation errors
   const cleanup = useCallback(() => {
-    if (directionsRendererRef.current) {
-      directionsRendererRef.current.setMap(null);
-      directionsRendererRef.current = null;
-    }
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current = null;
+    try {
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current = null;
+      }
+    } catch (error) {
+      // Silently handle cleanup errors to prevent DOM manipulation exceptions
+      console.warn('Map cleanup warning:', error);
     }
   }, []);
 
@@ -54,7 +59,13 @@ export default function HybridRouteDisplay({
     }
 
     const calculateAndDisplayRoute = async () => {
-      if (!mapRef.current) return;
+      // Validate map container exists before proceeding
+      if (!mapRef.current) {
+        console.warn('Map container not found');
+        setErrorMessage('Harita konteyneri bulunamadı');
+        setStatus('error');
+        return;
+      }
 
       // Clean up previous instances
       cleanup();
@@ -65,6 +76,12 @@ export default function HybridRouteDisplay({
       try {
         // Haritayı ve rota çiziciyi oluştur
         const google = await GoogleMapsService.loadGoogleMaps();
+        
+        // Double-check map container still exists after async operation
+        if (!mapRef.current) {
+          throw new Error('Map container became unavailable during initialization');
+        }
+        
         const map = new google.maps.Map(mapRef.current, {
           zoom: 10,
           center: { lat: 36.8969, lng: 30.7133 }, // Antalya

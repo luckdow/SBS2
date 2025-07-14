@@ -568,42 +568,7 @@ function RouteStep({ onNext }: { onNext: (data: any) => void }) {
           />
         </div>
 
-        {/* Route Preview (No map calculation in step 1) */}
-        {formData.hotelLocation && (
-          <div className="space-y-4">
-            <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6">
-              <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
-                <Navigation className="h-6 w-6" />
-                <span>Seçilen Güzergah</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-start space-x-3">
-                  <div className="bg-green-500 p-2 rounded-lg flex-shrink-0">
-                    <MapPin className="h-4 w-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/70">Başlangıç</p>
-                    <p className="text-white font-medium">{getFromLocation()}</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="bg-red-500 p-2 rounded-lg flex-shrink-0">
-                    <MapPin className="h-4 w-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/70">Varış</p>
-                    <p className="text-white font-medium">{getToLocation()}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 bg-blue-500/20 border border-blue-500/50 rounded-xl p-3">
-                <p className="text-blue-200 text-sm text-center">
-                  🗺️ Detaylı rota ve harita bir sonraki adımda gösterilecek
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Date and Time */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

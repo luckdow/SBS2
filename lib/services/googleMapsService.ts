@@ -43,6 +43,11 @@ export class GoogleMapsService {
   ): Promise<google.maps.places.Autocomplete> {
     const google = await this.loadGoogleMaps();
     
+    // Validate input element exists
+    if (!input) {
+      throw new Error('Input element is required for autocomplete');
+    }
+    
     // TODO: Migrate to PlaceAutocompleteElement for new projects after March 2025
     // This API will be deprecated for new customers but continues to work for existing ones
     
@@ -67,6 +72,15 @@ export class GoogleMapsService {
   ): Promise<google.maps.Map> {
     const google = await this.loadGoogleMaps();
     
+    // Validate element exists and is attached to DOM
+    if (!element) {
+      throw new Error('Map: Expected mapDiv of type HTMLElement but was passed null.');
+    }
+    
+    if (!element.parentNode) {
+      throw new Error('Map element must be attached to the DOM before initialization');
+    }
+    
     const defaultOptions: google.maps.MapOptions = {
       zoom: 10,
       center: { lat: 36.8969, lng: 30.7133 }, // Antalya center
@@ -83,7 +97,12 @@ export class GoogleMapsService {
       ...options
     };
 
-    return new google.maps.Map(element, defaultOptions);
+    try {
+      return new google.maps.Map(element, defaultOptions);
+    } catch (error) {
+      console.error('Map creation failed:', error);
+      throw new Error(`Harita oluşturulamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+    }
   }
 
   static async getDirections(
