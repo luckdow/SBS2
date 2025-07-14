@@ -4,19 +4,32 @@ let isGoogleMapsLoading = false;
 let loadPromise: Promise<void> | null = null;
 let diagnosticInfo: any = {};
 
+// Get API key from environment with proper fallback
+const getApiKey = (): string => {
+  if (typeof window !== 'undefined') {
+    // Browser environment - check both window and process
+    return window.process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 
+           process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  }
+  // Server environment
+  return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+};
+
 // Enhanced API diagnostic capabilities
 export const getGoogleMapsApiDiagnostics = () => {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getApiKey();
   
   return {
-    apiKeyConfigured: !!(apiKey && apiKey !== 'your_google_maps_api_key_here'),
+    apiKeyConfigured: !!(apiKey && apiKey !== 'your_google_maps_api_key_here' && apiKey !== 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw'),
     apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'Not configured',
     isLoaded: isGoogleMapsLoaded,
     isLoading: isGoogleMapsLoading,
     lastError: diagnosticInfo.lastError,
     lastAttempt: diagnosticInfo.lastAttempt,
+    environment: typeof window !== 'undefined' ? 'browser' : 'server',
     possibleIssues: [
-      'API key might have domain restrictions that block localhost',
+      'API key might not be configured in Netlify environment variables',
+      'API key might have domain restrictions that block your domain',
       'Maps JavaScript API might not be enabled in Google Cloud Console',
       'Places API might not be enabled in Google Cloud Console', 
       'Directions API might not be enabled in Google Cloud Console',
@@ -39,54 +52,58 @@ export const getGoogleMapsApiDiagnostics = () => {
       '5. Enable: Maps JavaScript API, Places API, Directions API, Distance Matrix API',
       '6. Navigate to APIs & Services > Credentials',
       '7. Create API Key or edit existing one',
-      '8. For testing: Leave API key unrestricted OR add localhost:3000 to authorized domains',
-      '9. For production: Add your domain to HTTP referrers restrictions'
+      '8. In Netlify Dashboard: Site Settings → Environment Variables',
+      '9. Add: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY with your API key',
+      '10. For production: Add your domain to HTTP referrers restrictions in Google Cloud Console'
     ]
   };
 };
 
-// Test API key validity by making a direct request
+// Test API key validity using browser-based services only (safer than HTTP requests)
 export const validateGoogleMapsApiKey = async (): Promise<{
   isValid: boolean;
   error?: string;
   details?: any;
 }> => {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getApiKey();
   
-  if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
+  if (!apiKey || apiKey === 'your_google_maps_api_key_here' || apiKey === 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw') {
     return {
       isValid: false,
-      error: 'API key not configured'
+      error: 'API key not configured or using example key'
     };
   }
 
+  // In browser environment, we can only validate after the API is loaded
+  if (typeof window === 'undefined') {
+    return {
+      isValid: true, // Assume valid on server side
+      error: 'Cannot validate on server side'
+    };
+  }
+
+  // Check if API is loaded and working
+  if (!window.google || !window.google.maps) {
+    return {
+      isValid: false,
+      error: 'Google Maps API not loaded yet'
+    };
+  }
+
+  // Basic validation - if we can access the API objects, the key is likely valid
   try {
-    // Test with a simple geocoding request to validate the key
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=Antalya,Turkey&key=${apiKey}`
-    );
-    
-    const data = await response.json();
-    
-    if (data.status === 'OK') {
+    if (window.google.maps.places && window.google.maps.DirectionsService) {
       return { isValid: true };
-    } else if (data.status === 'REQUEST_DENIED') {
-      return {
-        isValid: false,
-        error: 'API key is invalid or restricted',
-        details: data.error_message
-      };
     } else {
       return {
-        isValid: false, 
-        error: `API returned status: ${data.status}`,
-        details: data.error_message
+        isValid: false,
+        error: 'Some Google Maps services are missing - check API enables in Google Cloud Console'
       };
     }
   } catch (error) {
     return {
       isValid: false,
-      error: 'Network error or API endpoint blocked',
+      error: 'Error accessing Google Maps services',
       details: error instanceof Error ? error.message : 'Unknown error'
     };
   }
@@ -109,10 +126,10 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
     return Promise.resolve();
   }
 
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getApiKey();
   
-  if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
-    const error = 'Google Maps API key not configured';
+  if (!apiKey || apiKey === 'your_google_maps_api_key_here' || apiKey === 'AIzaSyDa66vbuMgm_L4wdOgPutliu_PLzI3xqEw') {
+    const error = 'Google Maps API key not configured or using example key. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your environment variables.';
     console.error('🗺️', error);
     diagnosticInfo.lastError = error;
     diagnosticInfo.lastAttempt = new Date().toISOString();
@@ -138,13 +155,15 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
       };
       checkLoaded();
       
-      // Timeout after 10 seconds
+      // Timeout after 15 seconds (increased from 10)
       setTimeout(() => {
         if (!isGoogleMapsLoaded) {
           isGoogleMapsLoading = false;
-          reject(new Error('Google Maps API loading timeout'));
+          const timeoutError = 'Google Maps API loading timeout - existing script found but API not loaded';
+          diagnosticInfo.lastError = timeoutError;
+          reject(new Error(timeoutError));
         }
-      }, 10000);
+      }, 15000);
     });
     return loadPromise;
   }
@@ -182,28 +201,30 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
       delete (window as any)[callbackName];
       
       const errorDetails = {
+        error: 'Google Maps API script failed to load',
         url: script.src,
         keyPrefix: apiKey.substring(0, 8) + '...',
         timestamp: new Date().toISOString(),
         userAgent: navigator.userAgent,
         possibleCauses: [
-          'Domain restrictions: API key might be restricted to specific domains and localhost is not allowed',
-          'Missing API enables: Maps JavaScript API not enabled in Google Cloud Console',
-          'Missing API enables: Places API not enabled in Google Cloud Console',
-          'Missing API enables: Directions API not enabled in Google Cloud Console', 
-          'Missing API enables: Distance Matrix API not enabled in Google Cloud Console',
-          'Invalid API key: Key might be invalid, suspended, or deleted',
-          'Billing not enabled: Google Cloud project might not have billing configured',
-          'Browser blocking: Ad blockers or privacy settings might be blocking the script',
-          'Network issues: Firewall or proxy might be blocking Google APIs'
+          'Network connectivity issues to googleapis.com',
+          'API key restrictions: Domain not authorized in Google Cloud Console',
+          'API key invalid, suspended, or deleted',
+          'Required APIs not enabled: Maps JavaScript API, Places API, Directions API, Distance Matrix API',
+          'Billing not enabled for the Google Cloud project',
+          'Browser/extension blocking Google APIs (ad blockers, privacy tools)',
+          'Firewall or proxy blocking external requests',
+          'CORS issues with the current domain'
         ],
         nextSteps: [
           'Check Google Cloud Console > APIs & Services > Credentials',
-          'Verify API key is valid and not restricted',
+          'Verify API key is valid and active',
           'Enable all required APIs in Google Cloud Console',
+          'Check domain restrictions in API key settings',
           'Ensure billing is enabled for the project',
           'Test with unrestricted API key first',
-          'Check browser console for additional error details'
+          'Check browser console and network tab for details',
+          'Try in incognito mode to rule out browser extensions'
         ]
       };
       
@@ -214,28 +235,30 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
 
     document.head.appendChild(script);
     
-    // Timeout after 10 seconds
+    // Timeout after 15 seconds (increased from 10)
     setTimeout(() => {
       if (!isGoogleMapsLoaded) {
         isGoogleMapsLoading = false;
         delete (window as any)[callbackName];
         
         const timeoutError = {
-          error: 'Google Maps API loading timeout after 10 seconds',
+          error: 'Google Maps API loading timeout after 15 seconds',
           timestamp: new Date().toISOString(), 
           possibleCauses: [
             'Slow network connection to Google APIs',
             'API key restrictions blocking the request',
             'Google APIs experiencing downtime or issues',
             'Browser or network blocking Google Maps domains',
-            'Too many concurrent requests to Google APIs'
+            'Too many concurrent requests to Google APIs',
+            'DNS resolution issues for googleapis.com'
           ],
           troubleshooting: [
             'Check network connectivity to googleapis.com',
             'Verify API key configuration in Google Cloud Console',
             'Test with a fresh browser session (clear cache)',
             'Check if other Google services work',
-            'Try again in a few minutes in case of temporary issues'
+            'Try again in a few minutes in case of temporary issues',
+            'Test from a different network/device to isolate issues'
           ]
         };
         
@@ -243,7 +266,7 @@ export const loadGoogleMapsAPI = (): Promise<void> => {
         diagnosticInfo.lastError = timeoutError;
         reject(new Error('Google Maps API loading timeout'));
       }
-    }, 10000);
+    }, 15000);
   });
 
   return loadPromise;

@@ -39,8 +39,19 @@ export default function GoogleMapsDiagnostics({ onClose }: GoogleMapsDiagnostics
   };
 
   const copyApiKey = () => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-    navigator.clipboard.writeText(apiKey);
+    // Use the same function as the service
+    const getApiKey = (): string => {
+      if (typeof window !== 'undefined') {
+        return window.process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 
+               process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+      }
+      return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+    };
+    
+    const apiKey = getApiKey();
+    if (apiKey) {
+      navigator.clipboard.writeText(apiKey);
+    }
   };
 
   if (loading) {
@@ -259,7 +270,16 @@ export default function GoogleMapsDiagnostics({ onClose }: GoogleMapsDiagnostics
               </button>
             </div>
             <div className="bg-black/20 rounded-lg p-3 font-mono text-sm text-white/80 break-all">
-              {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'Not configured'}
+              {(() => {
+                const getApiKey = (): string => {
+                  if (typeof window !== 'undefined') {
+                    return window.process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 
+                           process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+                  }
+                  return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+                };
+                return getApiKey() || 'Not configured';
+              })()}
             </div>
           </div>
 
