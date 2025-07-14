@@ -29,11 +29,6 @@ export const storage = getStorage(app);
 
 // Check if Firebase is properly configured
 export const isFirebaseConfigured = () => {
-  // Force mock mode for testing in this environment 
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-    return false; // Use mock mode on localhost for testing
-  }
-  
   return firebaseConfig.apiKey !== "AIzaSyDemo-Key-Replace-With-Real" && 
          firebaseConfig.projectId !== "sbs-travel-demo" &&
          firebaseConfig.apiKey.startsWith("AIza");

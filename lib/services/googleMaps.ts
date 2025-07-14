@@ -100,38 +100,37 @@ export class GoogleMapsService {
         return this.getFallbackSuggestions(input);
       }
 
-      // Check if Google Maps JavaScript API is loaded
-      if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places) {
-        return new Promise((resolve) => {
-          const service = new window.google.maps.places.AutocompleteService();
-          
-          service.getPlacePredictions({
-            input: input,
-            componentRestrictions: { country: 'tr' },
-            language: 'tr'
-          }, (predictions: any, status: any) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-              const result = {
-                suggestions: predictions.map((prediction: any) => prediction.description),
-                status: 'success' as const
-              };
-              
-              // Cache the result
-              this.cache.set(cacheKey, {
-                data: result,
-                timestamp: Date.now()
-              });
-              
-              resolve(result);
-            } else {
-              console.warn('🗺️ Google Places AutocompleteService error:', status);
-              resolve(this.getFallbackSuggestions(input));
-            }
-          });
+      // Use REST API instead of browser-side service for better reliability
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:tr&language=tr&key=${this.apiKey}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.predictions) {
+        const result = {
+          suggestions: data.predictions.map((prediction: any) => prediction.description),
+          status: 'success' as const
+        };
+        
+        // Cache the result
+        this.cache.set(cacheKey, {
+          data: result,
+          timestamp: Date.now()
         });
+        
+        console.log('🗺️ Address suggestions fetched via REST API:', result.suggestions.length, 'results');
+        return result;
+      } else if (data.status === 'ZERO_RESULTS') {
+        const result = { suggestions: [], status: 'success' as const };
+        this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+        return result;
       } else {
-        console.warn('🗺️ Google Maps JavaScript API not loaded, using fallback suggestions');
-        return this.getFallbackSuggestions(input);
+        throw new Error(`Places API error: ${data.status}`);
       }
     } catch (error) {
       console.error('🗺️ Google Places Autocomplete Error:', error);
@@ -226,24 +225,32 @@ export class GoogleMapsService {
 
   // Fallback address suggestions
   private static getFallbackSuggestions(input: string) {
-    const turkishCities = [
+    const turkishLocations = [
       'Antalya Havalimanı Terminal 1',
       'Antalya Havalimanı Terminal 2',
-      'Lara Beach',
-      'Konyaaltı Beach',
-      'Kemer Marina',
-      'Side Antik Tiyatro',
-      'Belek Golf Resort',
+      'Lara Beach Hotel, Antalya',
+      'Lara Beach, Antalya',
+      'Lara Kundu Beach',
+      'Konyaaltı Beach, Antalya',
+      'Kemer Marina, Antalya',
+      'Side Antik Tiyatro, Antalya',
+      'Belek Golf Resort, Antalya',
       'Kaleiçi, Antalya',
-      'Antalya Şehir Merkezi'
+      'Antalya Şehir Merkezi',
+      'Aspendos Antik Tiyatrosu, Antalya',
+      'Düden Şelalesi, Antalya',
+      'Köprülü Kanyon, Antalya',
+      'Olympos Antik Kenti, Antalya'
     ];
     
-    const suggestions = turkishCities.filter(city => 
-      city.toLowerCase().includes(input.toLowerCase())
+    const lowerInput = input.toLowerCase();
+    const suggestions = turkishLocations.filter(location => 
+      location.toLowerCase().includes(lowerInput) ||
+      location.toLowerCase().replace(/[,\s]/g, '').includes(lowerInput.replace(/[,\s]/g, ''))
     );
     
     return {
-      suggestions: suggestions.slice(0, 5),
+      suggestions: suggestions.slice(0, 8),
       status: 'success' as const
     };
   }
