@@ -32,7 +32,8 @@ import {
   Sparkles,
   ArrowUp,
   ArrowDown,
-  MoreVertical
+  MoreVertical,
+  Database
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -289,6 +290,10 @@ export default function AdminDashboard() {
             <p className="text-white/70 text-lg">SBS Travel operasyon merkezi</p>
           </motion.div>
           <div className="flex space-x-3">
+            <Link href="/admin/seed" className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-6 py-3 rounded-xl hover:from-yellow-600 hover:to-orange-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2">
+              <Database className="h-5 w-5" />
+              <span>Veritabanını Sıfırla</span>
+            </Link>
             <button className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2">
               <Plus className="h-5 w-5" />
               <span>Yeni Rezervasyon</span>
