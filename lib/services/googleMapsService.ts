@@ -488,6 +488,150 @@ export class GoogleMapsService {
       }
     }
   }
+
+  // Force cleanup all Google Maps elements from DOM to prevent removeChild errors
+  static forceCleanupAllGoogleMapsElements(): void {
+    try {
+      // Find and safely remove all Google Maps related elements that might be stuck in DOM
+      const selectors = [
+        '.pac-container', // Autocomplete dropdown containers
+        '.gm-style', // Google Maps style containers
+        '[class*="gm-"]', // Any element with gm- class prefix
+        '[id*="gmap"]', // Any element with gmap id
+        '.pac-item', // Autocomplete items
+        '.pac-matched' // Autocomplete matched text
+      ];
+
+      selectors.forEach(selector => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(element => {
+            try {
+              // Use defensive DOM removal
+              this.safeRemoveElement(element as HTMLElement);
+            } catch (error) {
+              console.warn(`Could not remove Google Maps element with selector ${selector}:`, error);
+            }
+          });
+        } catch (error) {
+          console.warn(`Could not query Google Maps elements with selector ${selector}:`, error);
+        }
+      });
+
+      // Additional cleanup for any orphaned Google Maps elements
+      this.cleanupOrphanedGoogleMapsElements();
+    } catch (error) {
+      console.warn('Force cleanup of Google Maps elements failed (non-critical):', error);
+    }
+  }
+
+  // Defensive DOM element removal to prevent removeChild errors
+  static safeRemoveElement(element: HTMLElement): void {
+    try {
+      if (!element) return;
+
+      // Multiple safe removal strategies
+      
+      // Strategy 1: Use modern remove() method if available
+      if (typeof element.remove === 'function') {
+        try {
+          element.remove();
+          return;
+        } catch (removeError) {
+          console.warn('Modern remove() failed, trying parentNode approach:', removeError);
+        }
+      }
+
+      // Strategy 2: Use parentNode.removeChild with validation
+      if (element.parentNode) {
+        try {
+          // Validate parent-child relationship before removal
+          if (element.parentNode.contains(element)) {
+            element.parentNode.removeChild(element);
+            return;
+          } else {
+            console.warn('Element is not a child of its reported parent - DOM inconsistency detected');
+          }
+        } catch (parentError) {
+          console.warn('parentNode.removeChild failed:', parentError);
+        }
+      }
+
+      // Strategy 3: Try to clear element content as fallback
+      try {
+        if (element.isConnected) {
+          element.innerHTML = '';
+          element.remove?.();
+        }
+      } catch (contentError) {
+        console.warn('Element content clearing failed:', contentError);
+      }
+    } catch (error) {
+      console.warn('All removal strategies failed for element (non-critical):', error);
+    }
+  }
+
+  // Clean up orphaned Google Maps elements that may be detached from main containers
+  static cleanupOrphanedGoogleMapsElements(): void {
+    try {
+      // Find elements that might be Google Maps related but disconnected
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(element => {
+        try {
+          const elementClasses = element.className?.toString() || '';
+          const elementId = element.id || '';
+          
+          // Check if element looks like a Google Maps element
+          const isGoogleMapsElement = (
+            elementClasses.includes('pac-') ||
+            elementClasses.includes('gm-') ||
+            elementId.includes('gmap') ||
+            elementId.includes('pac') ||
+            elementClasses.includes('google-maps')
+          );
+
+          if (isGoogleMapsElement && !element.isConnected) {
+            // Element appears to be orphaned, try to clean it up
+            this.safeRemoveElement(element as HTMLElement);
+          }
+        } catch (error) {
+          // Individual element check failed - continue with others
+          console.warn('Could not check individual element for Google Maps cleanup:', error);
+        }
+      });
+    } catch (error) {
+      console.warn('Orphaned Google Maps elements cleanup failed (non-critical):', error);
+    }
+  }
+
+  // Defensive wrapper for DOM operations that might fail
+  static safeDOMOperation<T>(operation: () => T, operationName: string, fallbackValue?: T): T | undefined {
+    try {
+      return operation();
+    } catch (error) {
+      console.warn(`DOM operation "${operationName}" failed:`, error);
+      return fallbackValue;
+    }
+  }
+
+  // Enhanced cleanup with step transition safety
+  static async safeStepTransitionCleanup(additionalDelay: number = 100): Promise<void> {
+    try {
+      // Force cleanup all Google Maps elements
+      this.forceCleanupAllGoogleMapsElements();
+      
+      // Wait for cleanup to complete
+      await new Promise(resolve => setTimeout(resolve, additionalDelay));
+      
+      // Double-check and cleanup any remaining elements
+      this.forceCleanupAllGoogleMapsElements();
+      
+      // Additional wait for DOM to stabilize
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } catch (error) {
+      console.warn('Step transition cleanup failed (non-critical):', error);
+    }
+  }
 }
 
 export default GoogleMapsService;
