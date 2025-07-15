@@ -50,39 +50,71 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
     baggage: 1,
   });
 
-  // Rota çizimi için tam 'place' nesnesini saklamak üzere state oluşturuldu.
   const [hotelPlace, setHotelPlace] = useState<google.maps.places.PlaceResult | undefined>();
+  const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; distanceText: string; durationText: string; } | null>(null);
 
   const getFromLocation = () => formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
   const getToLocation = () => formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı';
 
-  // Bu fonksiyon, hem metin değerini hem de tam 'place' nesnesini alır.
   const handleHotelLocationChange = (value: string, place?: google.maps.places.PlaceResult) => {
-    setFormData({ ...formData, hotelLocation: value });
-    
-    // Eğer kullanıcı listeden geçerli bir yer seçtiyse, 'place' nesnesini state'e kaydet.
+    setFormData(prev => ({ ...prev, hotelLocation: value }));
     if (place && place.geometry) {
       setHotelPlace(place);
+      setRouteInfo(null);
     } else {
-      // Eğer kullanıcı sadece metin yazıyorsa veya seçim geçersizse, 'place' nesnesini temizle.
       setHotelPlace(undefined);
+      setRouteInfo(null);
     }
+  };
+
+  const handleRouteCalculated = (result: { distance: number; duration: number; distanceText: string; durationText: string; }) => {
+    setRouteInfo(result);
+  };
+
+  const getMinDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const validateDateTime = () => {
+    if (!formData.date || !formData.time) {
+      toast.error("Lütfen tarih ve saat seçin.");
+      return false;
+    }
+
+    const reservationDateTime = new Date(`${formData.date}T${formData.time}`);
+    const now = new Date();
+    const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+
+    if (reservationDateTime < now) {
+      toast.error("Geçmiş bir tarih veya saat seçilemez.");
+      return false;
+    }
+    
+    if (reservationDateTime < fourHoursFromNow) {
+      toast.error("Rezervasyon, en az 4 saat sonrası için yapılmalıdır.");
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Butonun aktif olması için artık 'hotelPlace' nesnesinin varlığı kontrol ediliyor.
-    if (!hotelPlace) {
-      toast.error("Lütfen listeden geçerli bir konum seçin.");
+    if (!hotelPlace || !routeInfo) {
+      toast.error("Lütfen listeden geçerli bir konum seçin ve rotanın hesaplanmasını bekleyin.");
+      return;
+    }
+    if (!validateDateTime()) {
       return;
     }
     const submitData = { 
       ...formData, 
       from: getFromLocation(), 
       to: getToLocation(), 
-      distance: 25, // Bu değer 2. adımda güncellenecek
-      estimatedDuration: '30 dakika', 
-      hotelPlace: hotelPlace // Rota çizimi için tam 'place' nesnesini bir sonraki adıma aktar
+      distance: Math.round(routeInfo.distance / 1000),
+      estimatedDuration: routeInfo.durationText,
+      hotelPlace: hotelPlace
     };
     onNext(submitData);
   };
@@ -133,12 +165,43 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
             />
           </GoogleMapsErrorBoundary>
         </div>
+        
+        <AnimatePresence>
+          {hotelPlace && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginTop: '2rem' }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="space-y-4">
+                <GoogleMapsErrorBoundary>
+                  <HybridRouteDisplay 
+                    origin={getFromLocation()}
+                    destination={getToLocation()}
+                    originPlace={formData.direction === 'hotel-to-airport' ? hotelPlace : undefined}
+                    destinationPlace={formData.direction === 'airport-to-hotel' ? hotelPlace : undefined}
+                    onRouteCalculated={handleRouteCalculated}
+                  />
+                </GoogleMapsErrorBoundary>
+                {routeInfo && (
+                  <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-3 text-center">
+                    <p className="text-green-200 text-sm">
+                      ✅ Rota hesaplandı: Yaklaşık {routeInfo.distanceText} / {routeInfo.durationText}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="block text-lg font-semibold text-white">Tarih</label>
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50" required />
+              <input type="date" value={formData.date} min={getMinDate()} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50" required />
             </div>
           </div>
           <div className="space-y-2">
@@ -168,7 +231,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
         <div className="flex justify-end pt-4">
           <button 
             type="submit" 
-            disabled={!hotelPlace || disabled} 
+            disabled={!hotelPlace || !routeInfo || disabled} 
             className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2"
           >
             <span>Devam Et</span>
