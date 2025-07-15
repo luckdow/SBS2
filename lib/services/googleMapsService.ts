@@ -7,9 +7,36 @@
  */
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
+  private static librariesPromise: Promise<void> | null = null;
   
   // *** DOĞRU DEĞİŞKEN ADI: NEXT_PUBLIC_Maps_API_KEY ***
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
+
+  /**
+   * Gerekli Google Maps kütüphanelerini (places, geometry) asenkron olarak yükler.
+   * Bu fonksiyon, ana script yüklendikten sonra çağrılır.
+   */
+  private static async loadLibraries(): Promise<void> {
+    if (this.librariesPromise) {
+      return this.librariesPromise;
+    }
+
+    this.librariesPromise = (async () => {
+      try {
+        // 'places' ve 'geometry' kütüphanelerini yükle
+        await google.maps.importLibrary("places");
+        await google.maps.importLibrary("geometry");
+        console.log('✅ Google Maps "places" ve "geometry" kütüphaneleri başarıyla yüklendi.');
+      } catch (e) {
+        console.error('❌ Google Maps kütüphaneleri yüklenemedi:', e);
+        // Hata durumunda promise'i sıfırla ki tekrar denenebilsin
+        this.librariesPromise = null; 
+        throw new Error('Gerekli Google Haritalar kütüphaneleri (places, geometry) yüklenemedi.');
+      }
+    })();
+    
+    return this.librariesPromise;
+  }
 
   /**
    * Google Maps API script'ini, eğer daha önce yüklenmediyse, güvenli bir şekilde sayfaya ekler.
@@ -17,13 +44,17 @@ export class GoogleMapsService {
    */
   static loadGoogleMaps(): Promise<typeof window.google> {
     if (this.loadPromise) {
-      return this.loadPromise;
+      // Eğer ana promise zaten varsa, kütüphanelerin de yüklendiğinden emin ol
+      return this.loadPromise.then(google => {
+        return this.loadLibraries().then(() => google);
+      });
     }
 
     this.loadPromise = new Promise((resolve, reject) => {
       if (typeof window.google?.maps !== 'undefined') {
         console.log('✅ Google Maps zaten yüklü.');
-        return resolve(window.google);
+        this.loadLibraries().then(() => resolve(window.google)).catch(reject);
+        return;
       }
 
       if (!this.apiKey) {
@@ -37,22 +68,25 @@ export class GoogleMapsService {
       if (document.getElementById(scriptId)) {
         console.warn('Google Maps script elementi zaten DOM\'da mevcut.');
         setTimeout(() => {
-          if (window.google?.maps) resolve(window.google);
-          else reject(new Error('Mevcut Google Haritalar scripti yüklenemedi.'));
+          if (window.google?.maps) {
+             this.loadLibraries().then(() => resolve(window.google)).catch(reject);
+          } else {
+            reject(new Error('Mevcut Google Haritalar scripti yüklenemedi.'));
+          }
         }, 500);
         return;
       }
       
       const script = document.createElement('script');
       script.id = scriptId;
-      // PlaceAutocompleteElement web component'i için &loading=async parametresi eklendi
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry&loading=async&language=tr&region=TR`;
+      // 'libraries' parametresi kaldırıldı, çünkü artık dinamik olarak yüklüyoruz.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&loading=async&language=tr&region=TR`;
       script.async = true;
-      script.defer = true;
       
       script.onload = () => {
-        console.log('✅ Google Maps scripti başarıyla yüklendi.');
-        resolve(window.google);
+        console.log('✅ Google Maps ana scripti başarıyla yüklendi.');
+        // Ana script yüklendikten sonra gerekli kütüphaneleri yükle
+        this.loadLibraries().then(() => resolve(window.google)).catch(reject);
       };
       
       script.onerror = () => {
@@ -76,93 +110,28 @@ export class GoogleMapsService {
       try {
         element.parentNode.removeChild(element);
       } catch (e) {
-        console.warn('Element temizlenirken beklenen bir hata oluştu (genellikle zararsız):', e);
+        // Hata durumunda konsola sadece bir uyarı yazdır, uygulamanın çökmesini engelle.
+        console.warn('safeRemoveElement: Element kaldırılamadı.', e);
       }
     }
   }
 
   /**
-   * PlaceAutocompleteElement web component'i için güvenli temizlik fonksiyonu.
+   * Sayfadaki tüm Google Maps ile ilgili elementleri (örneğin, otomatik tamamlama dropdown'ları)
+   * güvenli bir şekilde temizler. Bu, özellikle component'lar arası geçişlerde "ghost" elementlerin
+   * kalmasını ve "removeChild" hatalarını önler.
    */
-  static forceCleanupAllGoogleMapsElements(): void {
-    if (typeof window === 'undefined') return;
-    const selectors = ['.pac-container', 'gmp-place-autocomplete'];
-    console.log(`🧹 Google Maps temizliği başlatılıyor...`);
-    selectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        if (elements.length > 0) {
-            elements.forEach(element => this.safeRemoveElement(element as HTMLElement));
-        }
+  static forceCleanupAllGoogleMapsElements() {
+    console.log('🧹 Google Maps temizliği başlatılıyor...');
+    const pacContainers = document.querySelectorAll('.pac-container');
+    pacContainers.forEach((container, index) => {
+      console.log(`[${index + 1}/${pacContainers.length}] pac-container bulundu, kaldırılıyor...`);
+      this.safeRemoveElement(container as HTMLElement);
     });
-    console.log('✅ Google Maps temizliği tamamlandı.');
-  }
-
-  /**
-   * Yeni PlaceAutocompleteElement web component'ini güvenli bir şekilde yapılandırır
-   */
-  static configurePlaceAutocompleteElement(element: any): void {
-    try {
-      // TR ülke kısıtlaması
-      element.componentRestrictions = { country: ['tr'] };
-      
-      // İstenen alanlar
-      element.fields = ['place_id', 'geometry', 'name', 'formatted_address', 'types'];
-      
-      // Tip kısıtlamaları
-      element.types = ['establishment', 'geocode'];
-      
-      console.log('✅ PlaceAutocompleteElement yapılandırıldı');
-    } catch (error) {
-      console.warn('PlaceAutocompleteElement yapılandırılırken hata:', error);
+    if (pacContainers.length > 0) {
+      console.log('✅ Tüm .pac-container elementleri başarıyla temizlendi.');
+    } else {
+      console.log('ℹ️ Temizlenecek .pac-container elementi bulunamadı.');
     }
   }
-
-  /**
-   * Adımlar arası geçişler için özel temizlik fonksiyonu.
-   */
-  static safeStepTransitionCleanup(delay = 100): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        this.forceCleanupAllGoogleMapsElements();
-        resolve();
-      }, delay);
-    });
-  }
-
-  /**
-   * Rota hesaplama fonksiyonu.
-   */
-  static async getDirections(
-    origin: string | google.maps.LatLng | google.maps.LatLngLiteral | google.maps.Place,
-    destination: string | google.maps.LatLng | google.maps.LatLngLiteral | google.maps.Place,
-    travelMode: google.maps.TravelMode = google.maps.TravelMode.DRIVING
-  ): Promise<google.maps.DirectionsResult> {
-    const google = await this.loadGoogleMaps();
-    if (!origin || !destination) throw new Error('Başlangıç ve varış noktaları gereklidir');
-
-    const directionsService = new google.maps.DirectionsService();
-    return new Promise((resolve, reject) => {
-      directionsService.route(
-        {
-          origin,
-          destination,
-          travelMode,
-          unitSystem: google.maps.UnitSystem.METRIC,
-          region: 'TR'
-        },
-        (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK && result) {
-            resolve(result);
-          } else {
-            let userFriendlyError = 'Rota hesaplanamadı.';
-            if (status === 'ZERO_RESULTS') userFriendlyError = 'Belirtilen adresler arasında bir rota bulunamadı.';
-            else if (status === 'NOT_FOUND') userFriendlyError = 'Adreslerden biri haritada bulunamadı.';
-            reject(new Error(userFriendlyError));
-          }
-        }
-      );
-    });
-  }
 }
-
-export default GoogleMapsService;
