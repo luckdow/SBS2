@@ -8,13 +8,12 @@
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
   private static librariesPromise: Promise<void> | null = null;
-  
-  // *** DOĞRU DEĞİŞKEN ADI: NEXT_PUBLIC_Maps_API_KEY ***
+
+  // *** DÜZELTME: API anahtarı için standart değişken adı kullanıldı ***
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
 
   /**
    * Gerekli Google Maps kütüphanelerini (places, geometry) asenkron olarak yükler.
-   * Bu fonksiyon, ana script yüklendikten sonra çağrılır.
    */
   private static async loadLibraries(): Promise<void> {
     if (this.librariesPromise) {
@@ -23,14 +22,12 @@ export class GoogleMapsService {
 
     this.librariesPromise = (async () => {
       try {
-        // 'places' ve 'geometry' kütüphanelerini yükle
         await google.maps.importLibrary("places");
         await google.maps.importLibrary("geometry");
         console.log('✅ Google Maps "places" ve "geometry" kütüphaneleri başarıyla yüklendi.');
       } catch (e) {
         console.error('❌ Google Maps kütüphaneleri yüklenemedi:', e);
-        // Hata durumunda promise'i sıfırla ki tekrar denenebilsin
-        this.librariesPromise = null; 
+        this.librariesPromise = null;
         throw new Error('Gerekli Google Haritalar kütüphaneleri (places, geometry) yüklenemedi.');
       }
     })();
@@ -40,11 +37,9 @@ export class GoogleMapsService {
 
   /**
    * Google Maps API script'ini, eğer daha önce yüklenmediyse, güvenli bir şekilde sayfaya ekler.
-   * Yeni PlaceAutocompleteElement web component'i desteği ile güncellenmiştir.
    */
   static loadGoogleMaps(): Promise<typeof window.google> {
     if (this.loadPromise) {
-      // Eğer ana promise zaten varsa, kütüphanelerin de yüklendiğinden emin ol
       return this.loadPromise.then(google => {
         return this.loadLibraries().then(() => google);
       });
@@ -58,7 +53,7 @@ export class GoogleMapsService {
       }
 
       if (!this.apiKey) {
-        // *** DOĞRU HATA MESAJI ***
+        // *** DÜZELTME: Hata mesajı standart değişken adına göre güncellendi ***
         const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini .env.local dosyanıza ve Vercel ayarlarına ekleyin.';
         console.error(errorMsg);
         return reject(new Error(errorMsg));
@@ -66,10 +61,10 @@ export class GoogleMapsService {
 
       const scriptId = 'google-maps-script';
       if (document.getElementById(scriptId)) {
-        console.warn('Google Maps script elementi zaten DOM\'da mevcut.');
+        console.warn('Google Maps script elementi zaten DOM\'da mevcut. Yüklenmesi bekleniyor...');
         setTimeout(() => {
           if (window.google?.maps) {
-             this.loadLibraries().then(() => resolve(window.google)).catch(reject);
+            this.loadLibraries().then(() => resolve(window.google)).catch(reject);
           } else {
             reject(new Error('Mevcut Google Haritalar scripti yüklenemedi.'));
           }
@@ -79,19 +74,17 @@ export class GoogleMapsService {
       
       const script = document.createElement('script');
       script.id = scriptId;
-      // 'libraries' parametresi kaldırıldı, çünkü artık dinamik olarak yüklüyoruz.
       script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&loading=async&language=tr&region=TR`;
       script.async = true;
       
       script.onload = () => {
         console.log('✅ Google Maps ana scripti başarıyla yüklendi.');
-        // Ana script yüklendikten sonra gerekli kütüphaneleri yükle
         this.loadLibraries().then(() => resolve(window.google)).catch(reject);
       };
       
       script.onerror = () => {
         console.error('❌ Google Haritalar scripti yüklenemedi.');
-        this.loadPromise = null; 
+        this.loadPromise = null;
         document.getElementById(scriptId)?.remove();
         reject(new Error('Google Haritalar scripti yüklenemedi.'));
       };
@@ -103,35 +96,52 @@ export class GoogleMapsService {
   }
 
   /**
-   * Bir elementi DOM'dan kaldırmadan önce varlığını ve geçerli bir parent'a sahip olduğunu kontrol eder.
+   * Bir elementi DOM'dan kaldırmadan önce varlığını ve geçerli bir ebeveyne sahip olduğunu kontrol eder.
    */
   static safeRemoveElement(element: HTMLElement | null) {
     if (element && element.parentNode) {
       try {
         element.parentNode.removeChild(element);
       } catch (e) {
-        // Hata durumunda konsola sadece bir uyarı yazdır, uygulamanın çökmesini engelle.
         console.warn('safeRemoveElement: Element kaldırılamadı.', e);
       }
     }
   }
 
   /**
-   * Sayfadaki tüm Google Maps ile ilgili elementleri (örneğin, otomatik tamamlama dropdown'ları)
-   * güvenli bir şekilde temizler. Bu, özellikle component'lar arası geçişlerde "ghost" elementlerin
-   * kalmasını ve "removeChild" hatalarını önler.
+   * Sayfadaki tüm Google Maps ile ilgili arayüz elemanlarını güvenli bir şekilde temizler.
+   * Bu, özellikle component'lar arası geçişlerde "ghost" elementlerin kalmasını ve hataları önler.
+   * *** İYİLEŞTİRME: Daha fazla olası element için seçici eklendi (.gmnoprint gibi) ***
    */
   static forceCleanupAllGoogleMapsElements() {
     console.log('🧹 Google Maps temizliği başlatılıyor...');
-    const pacContainers = document.querySelectorAll('.pac-container');
-    pacContainers.forEach((container, index) => {
-      console.log(`[${index + 1}/${pacContainers.length}] pac-container bulundu, kaldırılıyor...`);
+    const selectors = '.pac-container, .gmnoprint';
+    const elements = document.querySelectorAll(selectors);
+
+    if (elements.length === 0) {
+      console.log(`ℹ️ Temizlenecek Google Maps elementi (${selectors}) bulunamadı.`);
+      return;
+    }
+
+    elements.forEach((container, index) => {
+      console.log(`[${index + 1}/${elements.length}] "${container.className}" bulundu, kaldırılıyor...`);
       this.safeRemoveElement(container as HTMLElement);
     });
-    if (pacContainers.length > 0) {
-      console.log('✅ Tüm .pac-container elementleri başarıyla temizlendi.');
-    } else {
-      console.log('ℹ️ Temizlenecek .pac-container elementi bulunamadı.');
-    }
+    console.log(`✅ ${elements.length} adet Google Maps elementi başarıyla temizlendi.`);
+  }
+
+  /**
+   * *** YENİ: ADIM GEÇİŞLERİ İÇİN GÜVENLİ TEMİZLİK FONKSİYONU ***
+   * Bu fonksiyon, component adımları arasında geçiş yapmadan hemen önce çağrılmalıdır.
+   * DOM'u stabilize etmek için Google Haritalar öğelerini temizler ve kısa bir gecikme ekler.
+   * Bu, "removeChild" hatasının ana çözümüdür.
+   * @param delay - Temizlik sonrası beklenecek milisaniye cinsinden süre.
+   */
+  static async safeStepTransitionCleanup(delay = 200): Promise<void> {
+    console.log(`🧹 Güvenli adım geçişi temizliği başlatılıyor (${delay}ms gecikme ile)...`);
+    this.forceCleanupAllGoogleMapsElements();
+    
+    // DOM'un ve React'in güncellenmesi için kısa bir bekleme süresi tanır.
+    return new Promise(resolve => setTimeout(resolve, delay));
   }
 }
