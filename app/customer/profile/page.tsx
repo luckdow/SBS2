@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
@@ -33,19 +33,29 @@ import {
   EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { AuthService } from '../../../lib/services/authService';
+import { realTimeReservationService } from '../../../lib/services/realTimeService';
+import { User as AppUser } from '../../../lib/types';
 import toast from 'react-hot-toast';
 
 export default function CustomerProfile() {
   const [activeTab, setActiveTab] = useState('profile');
   const [showPassword, setShowPassword] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const router = useRouter();
+  const isMountedRef = useRef(true);
+
   const [profileData, setProfileData] = useState({
-    firstName: 'Ahmet',
-    lastName: 'Yılmaz',
-    email: 'ahmet@email.com',
-    phone: '+90 532 123 4567',
-    dateOfBirth: '1985-05-15',
-    address: 'Antalya, Türkiye',
-    avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150'
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    dateOfBirth: '',
+    address: '',
+    avatar: ''
   });
 
   const [preferences, setPreferences] = useState({
@@ -69,14 +79,95 @@ export default function CustomerProfile() {
     twoFactorEnabled: false
   });
 
-  const membershipStats = {
-    level: 'Gold',
-    points: 1250,
-    totalTrips: 24,
-    totalSpent: 8450,
-    memberSince: '2023-01-15',
-    nextLevel: 'Platinum',
-    pointsToNext: 750
+  useEffect(() => {
+    isMountedRef.current = true;
+    const checkAuthAndLoadProfile = async () => {
+      const user = AuthService.getCurrentUser();
+      if (!user) {
+        router.push('/auth/signin');
+        return;
+      }
+
+      try {
+        const profile = await AuthService.getUserProfile(user);
+        if (profile && isMountedRef.current) {
+          setCurrentUser(profile);
+          
+          // Check if user has the right role for this page
+          if (profile.role !== 'customer') {
+            toast.error('Bu sayfaya erişim yetkiniz bulunmamaktadır!');
+            router.push(AuthService.getDashboardRoute(profile.role));
+            return;
+          }
+
+          // Update profile data with real user data
+          const nameParts = profile.name.split(' ');
+          setProfileData({
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
+            email: profile.email,
+            phone: profile.phone || '',
+            dateOfBirth: (profile as any).dateOfBirth || '',
+            address: (profile as any).address || '',
+            avatar: (profile as any).avatar || ''
+          });
+
+          // Load user's reservations for stats calculation
+          try {
+            const userReservations = await realTimeReservationService.getCustomerReservations(profile.id);
+            if (isMountedRef.current) {
+              setReservations(userReservations);
+            }
+          } catch (error) {
+            console.error('Error loading reservations:', error);
+            // Continue without reservations data
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+        if (isMountedRef.current) {
+          toast.error('Profil bilgileri yüklenirken hata oluştu!');
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+
+    checkAuthAndLoadProfile();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [router]);
+
+  // Calculate membership stats from real data
+  const membershipStats = currentUser ? (() => {
+    const stats = AuthService.calculateCustomerStats(reservations);
+    return {
+      level: stats.membershipLevel,
+      points: stats.loyaltyPoints,
+      totalTrips: stats.totalTrips,
+      totalSpent: stats.totalSpent,
+      memberSince: currentUser.createdAt ? currentUser.createdAt.toLocaleDateString('tr-TR') : 'Bilinmiyor',
+      nextLevel: stats.membershipLevel === 'Bronze' ? 'Silver' : 
+                stats.membershipLevel === 'Silver' ? 'Gold' : 
+                stats.membershipLevel === 'Gold' ? 'Platinum' : 'Platinum',
+      pointsToNext: Math.max(0, 
+        stats.membershipLevel === 'Bronze' ? 200 - stats.loyaltyPoints :
+        stats.membershipLevel === 'Silver' ? 500 - stats.loyaltyPoints :
+        stats.membershipLevel === 'Gold' ? 1000 - stats.loyaltyPoints : 0
+      )
+    };
+  })() : {
+    level: 'Bronze',
+    points: 0,
+    totalTrips: 0,
+    totalSpent: 0,
+    memberSince: '',
+    nextLevel: 'Silver',
+    pointsToNext: 200
   };
 
   const handleSaveProfile = () => {
@@ -102,6 +193,21 @@ export default function CustomerProfile() {
     { id: 'security', name: 'Güvenlik', icon: Shield },
     { id: 'membership', name: 'Üyelik', icon: Crown }
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Profil yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null; // Will redirect to signin
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -468,7 +574,7 @@ export default function CustomerProfile() {
                         <Crown className="h-8 w-8" />
                         <div>
                           <h4 className="text-2xl font-bold">{membershipStats.level} Üyelik</h4>
-                          <p className="opacity-90">Üye olma tarihi: {new Date(membershipStats.memberSince).toLocaleDateString('tr-TR')}</p>
+                          <p className="opacity-90">Üye olma tarihi: {membershipStats.memberSince}</p>
                         </div>
                       </div>
                       <div className="text-right">

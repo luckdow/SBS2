@@ -197,7 +197,9 @@ export class RealTimeReservationService {
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date()
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        startedAt: doc.data().startedAt?.toDate() || null,
+        completedAt: doc.data().completedAt?.toDate() || null
       })) as Reservation[];
       
       console.log('✅ Driver reservations loaded:', driverId, reservations.length);
@@ -205,6 +207,37 @@ export class RealTimeReservationService {
     } catch (error) {
       console.error('❌ Error loading driver reservations:', error);
       throw new Error('Failed to load driver reservations. Please try again.');
+    }
+  }
+
+  // Get customer reservations
+  async getCustomerReservations(customerId: string): Promise<Reservation[]> {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
+    }
+
+    try {
+      const q = query(
+        collection(db, this.collectionName),
+        where('customerId', '==', customerId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const reservations = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        startedAt: doc.data().startedAt?.toDate() || null,
+        completedAt: doc.data().completedAt?.toDate() || null
+      })) as Reservation[];
+      
+      console.log('✅ Customer reservations loaded:', customerId, reservations.length);
+      return reservations;
+    } catch (error) {
+      console.error('❌ Error loading customer reservations:', error);
+      throw new Error('Failed to load customer reservations. Please try again.');
     }
   }
 }
