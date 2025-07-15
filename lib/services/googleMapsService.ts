@@ -8,8 +8,7 @@
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
   
-  // *** DÜZELTME: API Anahtarı değişken adı standart hale getirildi. ***
-  // .env.local dosyanızdaki anahtarı doğru okuması için bu isim kullanılmalı.
+  // *** DOĞRU DEĞİŞKEN ADI: NEXT_PUBLIC_Maps_API_KEY ***
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
 
   /**
@@ -27,8 +26,8 @@ export class GoogleMapsService {
       }
 
       if (!this.apiKey) {
-        // *** DÜZELTME: Hata mesajındaki değişken adı da düzeltildi. ***
-        const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini .env.local dosyanıza ekleyin.';
+        // *** DOĞRU HATA MESAJI ***
+        const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini .env.local dosyanıza ve Vercel ayarlarına ekleyin.';
         console.error(errorMsg);
         return reject(new Error(errorMsg));
       }
