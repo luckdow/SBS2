@@ -31,34 +31,21 @@ export default function GoogleMapsProvider({ children }: { children: React.React
   const [error, setError] = useState<string | null>(null);
   const [google, setGoogle] = useState<typeof window.google | null>(null);
   
-  // Add isMounted ref to prevent state updates on unmounted components
   const isMountedRef = useRef(true);
-  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     
     const loadGoogleMaps = async () => {
       try {
-        // Only update state if component is still mounted
         if (!isMountedRef.current) return;
         
         setIsLoading(true);
         setError(null);
         
-        // Check if Google Maps is already loaded
-        if (typeof window !== 'undefined' && window.google?.maps) {
-          if (!isMountedRef.current) return;
-          setGoogle(window.google);
-          setIsLoaded(true);
-          setIsLoading(false);
-          return;
-        }
-        
-        // Load Google Maps using our service
+        // Load Google Maps using our central service
         const googleMaps = await GoogleMapsService.loadGoogleMaps();
         
-        // Check if component is still mounted before updating state
         if (!isMountedRef.current) return;
         
         setGoogle(googleMaps);
@@ -66,14 +53,12 @@ export default function GoogleMapsProvider({ children }: { children: React.React
         
         console.log('✅ Google Maps loaded globally via GoogleMapsProvider');
       } catch (err) {
-        // Only update state if component is still mounted
         if (!isMountedRef.current) return;
         
         const errorMessage = err instanceof Error ? err.message : 'Google Maps yüklenemedi';
         setError(errorMessage);
         console.warn('⚠️ Google Maps global loading failed:', errorMessage);
       } finally {
-        // Only update state if component is still mounted
         if (isMountedRef.current) {
           setIsLoading(false);
         }
@@ -82,42 +67,21 @@ export default function GoogleMapsProvider({ children }: { children: React.React
 
     loadGoogleMaps();
 
-    // Enhanced cleanup function with error handling
-    const cleanup = () => {
-      console.log('🧹 GoogleMapsProvider: Starting cleanup...');
+    // Component unmount olduğunda (sayfadan kaldırıldığında) çalışacak temizlik fonksiyonu
+    return () => {
+      console.log('🧹 GoogleMapsProvider: Component unmounting, starting cleanup...');
+      isMountedRef.current = false;
+      
+      // *** ANA DÜZELTME: Hatalı `safeDOMOperation` fonksiyonu kaldırıldı. ***
+      // Artık doğrudan, daha önce oluşturduğumuz güvenli temizlik fonksiyonunu çağırıyoruz.
+      // Bu, var olmayan bir fonksiyonu çağırma hatasını düzeltir.
       try {
-        // Force cleanup all Google Maps elements when provider unmounts
-        GoogleMapsService.safeDOMOperation(() => {
-          GoogleMapsService.forceCleanupAllGoogleMapsElements();
-        }, 'GoogleMapsProvider cleanup on unmount', undefined);
+        GoogleMapsService.forceCleanupAllGoogleMapsElements();
       } catch (cleanupError) {
         console.warn('GoogleMapsProvider cleanup error (non-critical):', cleanupError);
       }
     };
-    
-    cleanupRef.current = cleanup;
-    
-    return () => {
-      console.log('🧹 GoogleMapsProvider: Component unmounting...');
-      isMountedRef.current = false;
-      
-      // Execute cleanup with error handling
-      try {
-        if (cleanupRef.current) {
-          cleanupRef.current();
-        }
-      } catch (error) {
-        console.warn('GoogleMapsProvider unmount cleanup error (non-critical):', error);
-      }
-    };
-  }, []);
-
-  // Cleanup on component unmount
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  }, []); // Bu effect sadece component ilk yüklendiğinde bir kez çalışır.
 
   const value: GoogleMapsContextType = {
     isLoaded,
