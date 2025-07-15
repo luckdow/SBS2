@@ -4,8 +4,6 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
 interface GoogleMapsAutocompleteProps {
-  // Bu bileşen artık kendi input değerini yönettiği için 'value' prop'una ihtiyacı yok.
-  // Sadece başlangıç değeri ve değişiklikleri bildirmek için 'defaultValue' ve 'onChange' kullanır.
   defaultValue?: string;
   onChange: (value: string, place?: google.maps.places.PlaceResult) => void;
   placeholder: string;
@@ -109,8 +107,8 @@ export default function GoogleMapsAutocomplete({
       <input
         ref={inputRef}
         type="text"
-        defaultValue={defaultValue} // Dışarıdan gelen değeri sadece başlangıçta kullan
-        onChange={(e) => onChange(e.target.value, undefined)} // Kullanıcı yazarken sadece metni güncelle
+        defaultValue={defaultValue}
+        onChange={(e) => onChange(e.target.value, undefined)}
         placeholder={placeholder}
         className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all border-white/30 focus:border-blue-500 focus:ring-blue-500/50 ${className}`}
       />
