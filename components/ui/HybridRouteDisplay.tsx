@@ -29,128 +29,28 @@ export default function HybridRouteDisplay({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const isMountedRef = useRef(true); // Track component mount state
+  const isMountedRef = useRef(true);
+
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
-  const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
 
-  // Enhanced cleanup function to prevent DOM manipulation errors
-  const cleanup = useCallback(async () => {
-    try {
-      // Enhanced safety checks with additional validation and defensive DOM operations
-      if (directionsRendererRef.current) {
-        try {
-          // Check if map container is still valid before cleanup
-          if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
-            const mapDiv = mapInstanceRef.current.getDiv();
-            // Additional check: ensure map div is still connected and our ref matches
-            if (GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
-              // Only attempt cleanup if all elements are still properly connected
-              GoogleMapsService.safeDOMOperation(
-                () => directionsRendererRef.current?.setDirections({ routes: [] } as any),
-                'Clear directions'
-              );
-              GoogleMapsService.safeDOMOperation(
-                () => directionsRendererRef.current?.setMap(null),
-                'Clear directions renderer map'
-              );
-            } else {
-              console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
-            }
-          } else {
-            console.warn('Map instance or container unavailable during cleanup - skipping DirectionsRenderer cleanup');
-          }
-        } catch (rendererError) {
-          console.warn('DirectionsRenderer cleanup warning (non-critical):', rendererError);
-        }
-        directionsRendererRef.current = null;
-      }
-
-      if (mapInstanceRef.current) {
-        try {
-          const mapDiv = GoogleMapsService.safeDOMOperation(
-            () => mapInstanceRef.current?.getDiv(),
-            'Get map div for cleanup'
-          );
-          // Only validate if the map container matches our reference and is still connected
-          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
-            // Google Maps cleanup happens automatically when DOM element is removed
-            // Just clear our reference to prevent memory leaks
-          } else {
-            console.warn('Map div unavailable or mismatched during cleanup');
-          }
-        } catch (mapError) {
-          console.warn('Map cleanup warning (non-critical):', mapError);
-        }
-        mapInstanceRef.current = null;
-      }
-
-      // Force cleanup any remaining Google Maps elements specific to this component
-      if (mapRef.current) {
-        GoogleMapsService.safeDOMOperation(() => {
-          // Clear any remaining Google Maps elements within our container
-          const gmElements = mapRef.current?.querySelectorAll('[class*="gm-"], .pac-container');
-          gmElements?.forEach(element => {
-            GoogleMapsService.safeRemoveElement(element as HTMLElement);
-          });
-        }, 'Clean remaining Google Maps elements in route container');
-      }
-    } catch (error) {
-      console.warn('Route cleanup warning (non-critical):', error);
-    }
-  }, []);
-
-  // Enhanced cleanup on unmount with abort controller for pending operations and defensive DOM operations
-  useEffect(() => {
-    const abortController = new AbortController();
-    
-    return () => {
-      // Mark component as unmounted to prevent further DOM operations
-      isMountedRef.current = false;
-      // Signal any pending operations to abort
-      abortController.abort();
-      
-      // Enhanced cleanup with error handling
-      GoogleMapsService.safeDOMOperation(async () => {
-        await cleanup();
-        // Additional forced cleanup of any Google Maps elements
-        GoogleMapsService.forceCleanupAllGoogleMapsElements();
-      }, 'Route component unmount cleanup', undefined);
-    };
-  }, [cleanup]);
-
-  useEffect(() => {
-    if (!origin || !destination) {
+  const calculateAndDisplayRoute = useCallback(async () => {
+    // Componentin var olup olmadığını ve gerekli referansların atanıp atanmadığını kontrol et
+    if (!isMountedRef.current || !mapRef.current) {
       return;
     }
+    
+    setStatus('loading');
+    setErrorMessage('');
 
-    const calculateAndDisplayRoute = async () => {
-      // Validate map container exists before proceeding
-      if (!mapRef.current) {
-        console.warn('Map container not found');
-        setErrorMessage('Harita konteyneri bulunamadı');
-        setStatus('error');
-        return;
-      }
+    try {
+      const google = await GoogleMapsService.loadGoogleMaps();
 
-      // Clean up previous instances
-      cleanup();
+      // Async işlemden sonra kontrolleri tekrar yap
+      if (!isMountedRef.current || !mapRef.current) return;
 
-      setStatus('loading');
-      setRouteInfo(null);
-
-      try {
-        // Validate element before async operation
-        await GoogleMapsService.validateElementDuringAsync(mapRef.current, 'Map initialization');
-        
-        // Haritayı ve rota çiziciyi oluştur
-        const google = await GoogleMapsService.loadGoogleMaps();
-        
-        // Double-check map container still exists after async operation
-        if (!mapRef.current || !GoogleMapsService.safeElementCheck(mapRef.current)) {
-          throw new Error('Map container became unavailable during initialization');
-        }
-        
+      // Haritayı sadece bir kere oluştur
+      if (!mapInstanceRef.current) {
         const map = new google.maps.Map(mapRef.current, {
           zoom: 10,
           center: { lat: 36.8969, lng: 30.7133 }, // Antalya
@@ -158,113 +58,70 @@ export default function HybridRouteDisplay({
           streetViewControl: false,
           fullscreenControl: false,
         });
-        
-        const directionsRenderer = new google.maps.DirectionsRenderer({
-            polylineOptions: { strokeColor: '#3B82F6', strokeWeight: 4 }
-        });
-        
-        // Store references for cleanup
         mapInstanceRef.current = map;
-        directionsRendererRef.current = directionsRenderer;
-        
-        directionsRenderer.setMap(map);
-
-        // Rotayı hesapla
-        const result = await GoogleMapsService.getDirections(
-          originPlace?.geometry?.location || origin,
-          destinationPlace?.geometry?.location || destination
-        );
-        
-        // Final safety check before setting directions - validate all elements still exist
-        if (directionsRenderer && 
-            mapRef.current && 
-            GoogleMapsService.safeElementCheck(mapRef.current) &&
-            mapInstanceRef.current &&
-            directionsRendererRef.current === directionsRenderer &&
-            isMountedRef.current) { // Check component is still mounted
-          directionsRenderer.setDirections(result);
-        } else {
-          console.warn('Component unmounted or invalid during route calculation - skipping direction display');
-          return;
-        }
-
-        // Bilgileri ayarla ve state'i güncelle
-        const leg = result.routes[0].legs[0];
-        const routeData = {
-          distance: leg.distance?.value || 0,
-          duration: leg.duration?.value || 0,
-          distanceText: leg.distance?.text || '',
-          durationText: leg.duration?.text || '',
-        };
-
-        // Final check before updating state - ensure component is still mounted
-        if (mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current) && isMountedRef.current) {
-          setRouteInfo({ distanceText: routeData.distanceText, durationText: routeData.durationText });
-          onRouteCalculated?.(routeData);
-          setStatus('success');
-        } else {
-          console.warn('Component unmounted during route processing - skipping state update');
-        }
-
-      } catch (error) {
-        // Only set error state if component is still mounted
-        if (mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current) && isMountedRef.current) {
-          const msg = error instanceof Error
-            ? `Rota hesaplanamadı: ${error.message}`
-            : 'Bilinmeyen bir harita hatası oluştu.';
-          setErrorMessage(msg);
-          setStatus('error');
-          console.error('Google Maps Route Error:', msg);
-        } else {
-          console.warn('Component unmounted during error handling - skipping error display');
-        }
       }
-    };
+      
+      // Rota çiziciyi sadece bir kere oluştur
+      if (!directionsRendererRef.current) {
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+          polylineOptions: { strokeColor: '#3B82F6', strokeWeight: 5, strokeOpacity: 0.9 }
+        });
+        directionsRenderer.setMap(mapInstanceRef.current);
+        directionsRendererRef.current = directionsRenderer;
+      }
 
+      // Rotayı hesapla
+      const result = await GoogleMapsService.getDirections(
+        originPlace?.geometry?.location || origin,
+        destinationPlace?.geometry?.location || destination
+      );
+
+      // Son güvenlik kontrolü
+      if (!isMountedRef.current || !directionsRendererRef.current) return;
+
+      directionsRendererRef.current.setDirections(result);
+
+      const leg = result.routes[0]?.legs[0];
+      if (!leg?.distance || !leg?.duration) {
+        throw new Error("Rota bilgileri Google'dan eksik geldi.");
+      }
+
+      onRouteCalculated?.({
+        distance: leg.distance.value,
+        duration: leg.duration.value,
+        distanceText: leg.distance.text,
+        durationText: leg.duration.text,
+      });
+      
+      setStatus('success');
+
+    } catch (error) {
+      const msg = error instanceof Error ? `Rota gösterilemedi: ${error.message}` : 'Bilinmeyen harita hatası.';
+      setErrorMessage(msg);
+      setStatus('error');
+      console.error('HybridRouteDisplay Error:', msg);
+    }
+  }, [origin, destination, originPlace, destinationPlace, onRouteCalculated]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
     calculateAndDisplayRoute();
 
-  }, [origin, destination, originPlace, destinationPlace, onRouteCalculated, cleanup]);
+    // Component kaldırıldığında temizlik yap
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [calculateAndDisplayRoute]); // Bu effect, sadece props değiştiğinde tetiklenir.
 
   if (!origin || !destination) {
-    return (
-      <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6">
-        <div className="text-center py-8">
-          <Route className="h-12 w-12 text-white/60 mx-auto mb-3" />
-          <p className="text-white/70">Rota göstermek için başlangıç ve varış noktalarını seçin.</p>
-        </div>
-      </div>
-    );
+    return null; // Eğer başlangıç/bitiş yoksa hiçbir şey gösterme
   }
 
   return (
-    <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6">
-      <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
-        <Route className="h-6 w-6" />
-        <span>Rota Detayları</span>
-      </h3>
-      
-      {/* Rota başlangıç ve bitiş bilgileri */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="flex items-start space-x-3">
-            <div className="bg-green-500 p-2 rounded-lg flex-shrink-0"><MapPin className="h-4 w-4 text-white" /></div>
-            <div>
-                <p className="text-sm text-white/70">Başlangıç</p>
-                <p className="text-white font-medium text-sm">{origin}</p>
-            </div>
-        </div>
-        <div className="flex items-start space-x-3">
-            <div className="bg-red-500 p-2 rounded-lg flex-shrink-0"><MapPin className="h-4 w-4 text-white" /></div>
-            <div>
-                <p className="text-sm text-white/70">Varış</p>
-                <p className="text-white font-medium text-sm">{destination}</p>
-            </div>
-        </div>
-      </div>
-
-      {/* Harita ve Bilgi Alanı */}
-      <div className="relative h-64 bg-white/5 rounded-xl flex items-center justify-center" ref={mapRef}>
+    <div className="bg-white/5 backdrop-blur-md border border-white/20 rounded-2xl p-4">
+      <div className="relative h-64 bg-slate-800/50 rounded-xl flex items-center justify-center" ref={mapRef}>
         {status === 'loading' && (
-          <div className="text-center text-white">
+          <div className="text-center text-white/80">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p>Rota hesaplanıyor...</p>
           </div>
@@ -272,31 +129,11 @@ export default function HybridRouteDisplay({
         {status === 'error' && (
            <div className="text-center text-red-300 p-4">
             <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-            <p>Rota gösterilemedi.</p>
+            <p>Harita gösterilemedi.</p>
             <p className="text-xs mt-1">{errorMessage}</p>
           </div>
         )}
       </div>
-
-      {/* Mesafe ve Süre */}
-      {status === 'success' && routeInfo && (
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center space-x-3">
-                <div className="bg-blue-500 p-2 rounded-lg"><Navigation className="h-4 w-4 text-white" /></div>
-                <div>
-                    <p className="text-sm text-white/70">Mesafe</p>
-                    <p className="text-white font-bold text-lg">{routeInfo.distanceText}</p>
-                </div>
-            </div>
-            <div className="flex items-center space-x-3">
-                <div className="bg-purple-500 p-2 rounded-lg"><Clock className="h-4 w-4 text-white" /></div>
-                <div>
-                    <p className="text-sm text-white/70">Tahmini Süre</p>
-                    <p className="text-white font-bold text-lg">{routeInfo.durationText}</p>
-                </div>
-            </div>
-        </div>
-      )}
     </div>
   );
 }
