@@ -34,73 +34,76 @@ export default function HybridRouteDisplay({
   const [errorMessage, setErrorMessage] = useState('');
   const [routeInfo, setRouteInfo] = useState<{ distanceText: string; durationText: string } | null>(null);
 
-  // Enhanced cleanup function to prevent DOM manipulation errors
+  // Enhanced cleanup function with React-safe DOM operations
   const cleanup = useCallback(async () => {
     try {
-      // Enhanced safety checks with additional validation and defensive DOM operations
-      if (directionsRendererRef.current) {
-        try {
-          // Check if map container is still valid before cleanup
-          if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
-            const mapDiv = mapInstanceRef.current.getDiv();
-            // Additional check: ensure map div is still connected and our ref matches
-            if (GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
-              // Only attempt cleanup if all elements are still properly connected
-              GoogleMapsService.safeDOMOperation(
-                () => directionsRendererRef.current?.setDirections({ routes: [] } as any),
-                'Clear directions'
-              );
-              GoogleMapsService.safeDOMOperation(
-                () => directionsRendererRef.current?.setMap(null),
-                'Clear directions renderer map'
-              );
+      // Use React-safe DOM operations for cleanup
+      GoogleMapsService.safeReactDOMOperation(async () => {
+        // Enhanced safety checks with additional validation and defensive DOM operations
+        if (directionsRendererRef.current) {
+          try {
+            // Check if map container is still valid before cleanup
+            if (mapInstanceRef.current && mapRef.current && GoogleMapsService.safeElementCheck(mapRef.current)) {
+              const mapDiv = mapInstanceRef.current.getDiv();
+              // Additional check: ensure map div is still connected and our ref matches
+              if (GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
+                // Only attempt cleanup if all elements are still properly connected
+                GoogleMapsService.safeDOMOperation(
+                  () => directionsRendererRef.current?.setDirections({ routes: [] } as any),
+                  'Clear directions'
+                );
+                GoogleMapsService.safeDOMOperation(
+                  () => directionsRendererRef.current?.setMap(null),
+                  'Clear directions renderer map'
+                );
+              } else {
+                console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
+              }
             } else {
-              console.warn('Map container mismatch or disconnected during cleanup - skipping DirectionsRenderer cleanup');
+              console.warn('Map instance or container unavailable during cleanup - skipping DirectionsRenderer cleanup');
             }
-          } else {
-            console.warn('Map instance or container unavailable during cleanup - skipping DirectionsRenderer cleanup');
+          } catch (rendererError) {
+            console.warn('DirectionsRenderer cleanup warning (non-critical):', rendererError);
           }
-        } catch (rendererError) {
-          console.warn('DirectionsRenderer cleanup warning (non-critical):', rendererError);
+          directionsRendererRef.current = null;
         }
-        directionsRendererRef.current = null;
-      }
 
-      if (mapInstanceRef.current) {
-        try {
-          const mapDiv = GoogleMapsService.safeDOMOperation(
-            () => mapInstanceRef.current?.getDiv(),
-            'Get map div for cleanup'
-          );
-          // Only validate if the map container matches our reference and is still connected
-          if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
-            // Google Maps cleanup happens automatically when DOM element is removed
-            // Just clear our reference to prevent memory leaks
-          } else {
-            console.warn('Map div unavailable or mismatched during cleanup');
+        if (mapInstanceRef.current) {
+          try {
+            const mapDiv = GoogleMapsService.safeDOMOperation(
+              () => mapInstanceRef.current?.getDiv(),
+              'Get map div for cleanup'
+            );
+            // Only validate if the map container matches our reference and is still connected
+            if (mapDiv && GoogleMapsService.safeElementCheck(mapDiv) && mapDiv === mapRef.current) {
+              // Google Maps cleanup happens automatically when DOM element is removed
+              // Just clear our reference to prevent memory leaks
+            } else {
+              console.warn('Map div unavailable or mismatched during cleanup');
+            }
+          } catch (mapError) {
+            console.warn('Map cleanup warning (non-critical):', mapError);
           }
-        } catch (mapError) {
-          console.warn('Map cleanup warning (non-critical):', mapError);
+          mapInstanceRef.current = null;
         }
-        mapInstanceRef.current = null;
-      }
 
-      // Force cleanup any remaining Google Maps elements specific to this component
-      if (mapRef.current) {
-        GoogleMapsService.safeDOMOperation(() => {
-          // Clear any remaining Google Maps elements within our container
-          const gmElements = mapRef.current?.querySelectorAll('[class*="gm-"], .pac-container');
-          gmElements?.forEach(element => {
-            GoogleMapsService.safeRemoveElement(element as HTMLElement);
-          });
-        }, 'Clean remaining Google Maps elements in route container');
-      }
+        // Force cleanup any remaining Google Maps elements specific to this component
+        if (mapRef.current) {
+          GoogleMapsService.safeDOMOperation(() => {
+            // Clear any remaining Google Maps elements within our container
+            const gmElements = mapRef.current?.querySelectorAll('[class*="gm-"], .pac-container');
+            gmElements?.forEach(element => {
+              GoogleMapsService.safeRemoveElement(element as HTMLElement);
+            });
+          }, 'Clean remaining Google Maps elements in route container');
+        }
+      }, 'Route component cleanup', undefined, 1);
     } catch (error) {
       console.warn('Route cleanup warning (non-critical):', error);
     }
   }, []);
 
-  // Enhanced cleanup on unmount with abort controller for pending operations and defensive DOM operations
+  // Enhanced cleanup on unmount with React-safe DOM operations and abort controller
   useEffect(() => {
     const abortController = new AbortController();
     
@@ -110,12 +113,12 @@ export default function HybridRouteDisplay({
       // Signal any pending operations to abort
       abortController.abort();
       
-      // Enhanced cleanup with error handling
-      GoogleMapsService.safeDOMOperation(async () => {
+      // Enhanced cleanup with React-safe operations
+      GoogleMapsService.safeReactDOMOperation(async () => {
         await cleanup();
         // Additional forced cleanup of any Google Maps elements
         GoogleMapsService.forceCleanupAllGoogleMapsElements();
-      }, 'Route component unmount cleanup', undefined);
+      }, 'Route component unmount cleanup', undefined, 1);
     };
   }, [cleanup]);
 
@@ -129,6 +132,18 @@ export default function HybridRouteDisplay({
       if (!mapRef.current) {
         console.warn('Map container not found');
         setErrorMessage('Harita konteyneri bulunamadı');
+        setStatus('error');
+        return;
+      }
+
+      // Enhanced container preparation
+      const containerReady = await GoogleMapsService.prepareSafeContainer(
+        mapRef.current, 
+        'Route map initialization'
+      );
+      
+      if (!containerReady) {
+        setErrorMessage('Harita konteyneri hazırlanamadı');
         setStatus('error');
         return;
       }

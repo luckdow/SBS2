@@ -62,8 +62,15 @@ export default function GoogleMapsAutocomplete({
     onStatusChange?.('loading');
 
     try {
-      // Validate container element
-      await GoogleMapsService.validateElementDuringAsync(containerRef.current, 'Autocomplete initialization');
+      // Enhanced container preparation
+      const containerReady = await GoogleMapsService.prepareSafeContainer(
+        containerRef.current, 
+        'Autocomplete initialization'
+      );
+      
+      if (!containerReady) {
+        throw new Error('Container preparation failed - DOM element not ready');
+      }
 
       const result = await GoogleMapsService.createBestAutocomplete(containerRef.current, {
         componentRestrictions: { country: ['tr'] },
@@ -84,36 +91,39 @@ export default function GoogleMapsAutocomplete({
       if (result.type === 'modern') {
         const modernElement = result.element as google.maps.places.PlaceAutocompleteElement;
         
-        // Safely add to container if it's not already there
-        if (containerRef.current && !containerRef.current.contains(modernElement)) {
-          try {
+        // Use React-safe DOM operations for modern element handling
+        GoogleMapsService.safeReactDOMOperation(() => {
+          if (containerRef.current && !containerRef.current.contains(modernElement)) {
             // Hide the fallback input when modern element is active
             if (inputRef.current) {
               inputRef.current.style.display = 'none';
             }
             
-            // Clear existing content safely before adding new element
-            while (containerRef.current.firstChild && containerRef.current.firstChild !== inputRef.current) {
-              try {
-                const child = containerRef.current.firstChild;
-                // Use defensive DOM removal
-                GoogleMapsService.safeRemoveElement(child as HTMLElement);
-              } catch (removeError) {
-                console.warn('Could not remove child element:', removeError);
-                break;
-              }
-            }
+            // Enhanced container cleanup before adding new element
+            const container = containerRef.current;
+            const childrenToRemove: HTMLElement[] = [];
             
-            GoogleMapsService.safeDOMOperation(() => {
-              containerRef.current?.appendChild(modernElement);
-            }, 'Append modern autocomplete element');
-          } catch (appendError) {
-            console.warn('Could not append modern autocomplete element:', appendError);
-            // Fallback to legacy if modern element can't be added
-            await GoogleMapsService.safeAutocompleteCleanup(modernElement);
-            throw new Error('Failed to add modern autocomplete element to container');
+            // Collect children that need to be removed (except the input)
+            Array.from(container.children).forEach(child => {
+              if (child !== inputRef.current) {
+                childrenToRemove.push(child as HTMLElement);
+              }
+            });
+            
+            // Remove collected children safely
+            childrenToRemove.forEach(child => {
+              GoogleMapsService.safeRemoveElement(child);
+            });
+            
+            // Add modern element safely
+            try {
+              container.appendChild(modernElement);
+            } catch (appendError) {
+              console.warn('Could not append modern autocomplete element:', appendError);
+              throw new Error('Failed to add modern autocomplete element to container');
+            }
           }
-        }
+        }, 'Modern autocomplete element setup');
         
         modernElement.addEventListener('gmp-placeselect', (event: any) => {
           if (!isMountedRef.current) return;
@@ -173,18 +183,19 @@ export default function GoogleMapsAutocomplete({
     };
   }, [initializeAutocomplete]);
 
-  // Enhanced cleanup autocomplete on unmount with defensive DOM operations
+  // Enhanced cleanup autocomplete on unmount with React-safe DOM operations
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       if (autocompleteRef.current) {
-        GoogleMapsService.safeDOMOperation(async () => {
+        // Use React-safe cleanup
+        GoogleMapsService.safeReactDOMOperation(async () => {
           await GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
           autocompleteRef.current = null;
           autocompleteTypeRef.current = null;
           // Additional cleanup of any autocomplete-related elements
           GoogleMapsService.forceCleanupAllGoogleMapsElements();
-        }, 'Autocomplete component cleanup', undefined);
+        }, 'Autocomplete component cleanup', undefined, 1);
       }
     };
   }, []);
@@ -206,15 +217,22 @@ export default function GoogleMapsAutocomplete({
     setError('');
     setIsInitialized(false);
     if (autocompleteRef.current) {
-      GoogleMapsService.safeDOMOperation(async () => {
+      // Use React-safe cleanup for retry
+      GoogleMapsService.safeReactDOMOperation(async () => {
         await GoogleMapsService.safeAutocompleteCleanup(autocompleteRef.current);
         autocompleteRef.current = null;
         autocompleteTypeRef.current = null;
         // Force cleanup before retry
         GoogleMapsService.forceCleanupAllGoogleMapsElements();
-      }, 'Autocomplete retry cleanup', undefined);
+        
+        // Small delay before reinitializing
+        setTimeout(() => {
+          initializeAutocomplete();
+        }, 100);
+      }, 'Autocomplete retry cleanup', undefined, 1);
+    } else {
+      initializeAutocomplete();
     }
-    initializeAutocomplete();
   };
 
   return (

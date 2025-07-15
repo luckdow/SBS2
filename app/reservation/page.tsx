@@ -37,6 +37,7 @@ import HybridAddressInput from '../../components/ui/HybridAddressInput';
 import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import PaymentStep from '../../components/ui/PaymentStep';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
+import ErrorBoundary from '../../components/ui/ErrorBoundary';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -359,7 +360,12 @@ export default function ReservationPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <ErrorBoundary onError={(error, errorInfo) => {
+      console.error('Reservation page error caught by boundary:', error, errorInfo);
+      // Force cleanup of Google Maps elements on error
+      GoogleMapsService.forceCleanupAllGoogleMapsElements();
+    }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -490,6 +496,7 @@ export default function ReservationPage() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
 
