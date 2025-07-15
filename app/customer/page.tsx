@@ -33,6 +33,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '../../lib/services/authService';
+import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { User as AppUser } from '../../lib/types';
 import toast from 'react-hot-toast';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
@@ -41,50 +42,11 @@ export default function CustomerDashboard() {
   const [reservations, setReservations] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingReservations, setLoadingReservations] = useState(false);
   const router = useRouter();
   
   // Add isMounted ref to prevent state updates on unmounted components
   const isMountedRef = useRef(true);
-
-  // Mock reservations data defined before hooks
-  const mockReservations = [
-    {
-      id: 'RES001',
-      from: 'Antalya Havalimanı',
-      to: 'Lara Beach Hotel',
-      date: '2024-01-15',
-      time: '14:30',
-      status: 'completed',
-      driver: 'Mehmet Şoför',
-      vehicle: 'Mercedes E-Class',
-      price: 280,
-      rating: 5,
-      createdAt: new Date('2024-01-15')
-    },
-    {
-      id: 'RES002',
-      from: 'Kemer Marina',
-      to: 'Antalya Havalimanı',
-      date: '2024-01-20',
-      time: '16:00',
-      status: 'started',
-      driver: 'Ali Şoför',
-      vehicle: 'BMW X5',
-      price: 320,
-      createdAt: new Date('2024-01-20')
-    },
-    {
-      id: 'RES003',
-      from: 'Side Antik Tiyatro',
-      to: 'Belek Golf Resort',
-      date: '2024-01-25',
-      time: '18:15',
-      status: 'pending',
-      vehicle: 'Audi A6',
-      price: 180,
-      createdAt: new Date('2024-01-25')
-    }
-  ];
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -106,6 +68,9 @@ export default function CustomerDashboard() {
             router.push(AuthService.getDashboardRoute(profile.role));
             return;
           }
+
+          // Load user's reservations
+          await loadUserReservations(profile.id);
         }
       } catch (error) {
         console.error('Error loading user profile:', error);
@@ -126,10 +91,28 @@ export default function CustomerDashboard() {
     };
   }, [router]);
 
-  // Load reservations data - placed before conditional returns to follow React hooks rules
-  useEffect(() => {
-    setReservations(mockReservations);
-  }, []);
+  const loadUserReservations = async (userId: string) => {
+    if (!isMountedRef.current) return;
+    
+    setLoadingReservations(true);
+    try {
+      const userReservations = await realTimeReservationService.getCustomerReservations(userId);
+      if (isMountedRef.current) {
+        setReservations(userReservations);
+      }
+    } catch (error) {
+      console.error('Error loading reservations:', error);
+      if (isMountedRef.current) {
+        toast.error('Rezervasyonlar yüklenirken hata oluştu!');
+        // Fallback to empty array for better UX
+        setReservations([]);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingReservations(false);
+      }
+    }
+  };
 
   const handleSignOut = async () => {
     if (!isMountedRef.current) return;
@@ -164,22 +147,28 @@ export default function CustomerDashboard() {
   }
 
   // Use real user data instead of mock data
-  const customerStats = {
-    totalTrips: (currentUser as any).totalReservations || 0,
-    totalSpent: (currentUser as any).totalSpent || 0,
-    loyaltyPoints: (currentUser as any).loyaltyPoints || 0,
-    membershipLevel: (currentUser as any).membershipLevel || 'Bronze',
-    avgRating: (currentUser as any).avgRating || 5.0,
-    savedAmount: (currentUser as any).savedAmount || 0
+  const customerStats = currentUser ? AuthService.calculateCustomerStats(reservations) : {
+    totalTrips: 0,
+    totalSpent: 0,
+    loyaltyPoints: 0,
+    membershipLevel: 'Bronze',
+    avgRating: 0,
+    savedAmount: 0
   };
 
   // Use real customer info instead of mock data
-  const customerInfo = {
+  const customerInfo = currentUser ? {
     name: currentUser.name,
     email: currentUser.email,
     phone: currentUser.phone || 'Belirtilmemiş',
-    memberSince: new Date(currentUser.createdAt).toLocaleDateString('tr-TR'),
+    memberSince: currentUser.createdAt ? currentUser.createdAt.toLocaleDateString('tr-TR') : 'Bilinmiyor',
     avatar: (currentUser as any).avatar || null
+  } : {
+    name: 'Yükleniyor...',
+    email: '',
+    phone: '',
+    memberSince: '',
+    avatar: null
   };
 
   const getStatusColor = (status: string) => {
@@ -338,7 +327,7 @@ export default function CustomerDashboard() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold">{customerStats.membershipLevel} Üyelik</h3>
-                  <p className="opacity-90">Üye olma tarihi: {new Date(customerInfo.memberSince).toLocaleDateString('tr-TR')}</p>
+                  <p className="opacity-90">Üye olma tarihi: {customerInfo.memberSince}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -493,122 +482,134 @@ export default function CustomerDashboard() {
             </div>
 
             <div className="space-y-4">
-              {reservations.map((reservation, index) => (
-                <motion.div
-                  key={reservation.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.2 + index * 0.1 }}
-                  className="bg-white/5 rounded-xl p-6 hover:bg-white/10 transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-xl shadow-lg">
-                        <MapPin className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-white">#{reservation.id}</h3>
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-md ${getStatusColor(reservation.status)}`}>
-                          {getStatusIcon(reservation.status)}
-                          <span className="ml-1">{getStatusText(reservation.status)}</span>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-                        ₺{reservation.price}
-                      </p>
-                      {reservation.rating && (
-                        <div className="flex items-center space-x-1 justify-end">
-                          {[...Array(5)].map((_, i) => (
-                            <Star 
-                              key={i} 
-                              className={`h-4 w-4 ${i < reservation.rating ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} 
-                            />
-                          ))}
+              {loadingReservations ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+                  <p className="text-white/70">Rezervasyonlar yükleniyor...</p>
+                </div>
+              ) : reservations.length > 0 ? (
+                reservations.map((reservation, index) => (
+                  <motion.div
+                    key={reservation.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.2 + index * 0.1 }}
+                    className="bg-white/5 rounded-xl p-6 hover:bg-white/10 transition-all duration-300"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-xl shadow-lg">
+                          <MapPin className="h-6 w-6 text-white" />
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <h4 className="font-semibold text-white mb-2">Güzergah</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                          <span className="text-white/80 text-sm">{reservation.from}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                          <span className="text-white/80 text-sm">{reservation.to}</span>
+                        <div>
+                          <h3 className="text-lg font-bold text-white">#{reservation.id}</h3>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-md ${getStatusColor(reservation.status)}`}>
+                            {getStatusIcon(reservation.status)}
+                            <span className="ml-1">{getStatusText(reservation.status)}</span>
+                          </span>
                         </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold text-white mb-2">Tarih & Saat</h4>
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-white/60" />
-                          <span className="text-white/80 text-sm">{new Date(reservation.date).toLocaleDateString('tr-TR')}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-white/60" />
-                          <span className="text-white/80 text-sm">{reservation.time}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold text-white mb-2">Araç & Şoför</h4>
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <Car className="h-4 w-4 text-white/60" />
-                          <span className="text-white/80 text-sm">{reservation.vehicle}</span>
-                        </div>
-                        {reservation.driver && (
-                          <div className="flex items-center space-x-2">
-                            <User className="h-4 w-4 text-white/60" />
-                            <span className="text-white/80 text-sm">{reservation.driver}</span>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                          ₺{reservation.totalPrice || reservation.price || 0}
+                        </p>
+                        {reservation.rating && (
+                          <div className="flex items-center space-x-1 justify-end">
+                            {[...Array(5)].map((_, i) => (
+                              <Star 
+                                key={i} 
+                                className={`h-4 w-4 ${i < reservation.rating ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} 
+                              />
+                            ))}
                           </div>
                         )}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex justify-end space-x-3 mt-4">
-                    <button className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 flex items-center space-x-2">
-                      <Eye className="h-4 w-4" />
-                      <span>Detay</span>
-                    </button>
-                    <button className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 flex items-center space-x-2">
-                      <Download className="h-4 w-4" />
-                      <span>Fatura</span>
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <h4 className="font-semibold text-white mb-2">Güzergah</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span className="text-white/80 text-sm">{reservation.from}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                            <span className="text-white/80 text-sm">{reservation.to}</span>
+                          </div>
+                        </div>
+                      </div>
 
-            {reservations.length === 0 && (
-              <div className="text-center py-12">
-                <Car className="mx-auto h-12 w-12 text-white/40" />
-                <h3 className="mt-2 text-sm font-medium text-white">Henüz rezervasyon yok</h3>
-                <p className="mt-1 text-sm text-white/60">
-                  İlk rezervasyonunuzu yapmak için butona tıklayın.
-                </p>
-                <div className="mt-6">
-                  <Link 
-                    href="/reservation"
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 inline-flex items-center space-x-2"
-                  >
-                    <Plus className="h-5 w-5" />
-                    <span>Rezervasyon Yap</span>
-                  </Link>
+                      <div>
+                        <h4 className="font-semibold text-white mb-2">Tarih & Saat</h4>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-white/60" />
+                            <span className="text-white/80 text-sm">
+                              {reservation.date ? new Date(reservation.date).toLocaleDateString('tr-TR') : 
+                               reservation.createdAt ? reservation.createdAt.toLocaleDateString('tr-TR') : 'Bilinmiyor'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="h-4 w-4 text-white/60" />
+                            <span className="text-white/80 text-sm">{reservation.time || 'Belirtilmemiş'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold text-white mb-2">Araç & Şoför</h4>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <Car className="h-4 w-4 text-white/60" />
+                            <span className="text-white/80 text-sm">
+                              {reservation.vehicle?.name || reservation.vehicle || 'Belirtilmemiş'}
+                            </span>
+                          </div>
+                          {(reservation.driver?.name || reservation.driver) && (
+                            <div className="flex items-center space-x-2">
+                              <User className="h-4 w-4 text-white/60" />
+                              <span className="text-white/80 text-sm">
+                                {reservation.driver?.name || reservation.driver}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-3 mt-4">
+                      <button className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 flex items-center space-x-2">
+                        <Eye className="h-4 w-4" />
+                        <span>Detay</span>
+                      </button>
+                      <button className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 flex items-center space-x-2">
+                        <Download className="h-4 w-4" />
+                        <span>Fatura</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="text-center py-12">
+                  <Car className="mx-auto h-12 w-12 text-white/40" />
+                  <h3 className="mt-2 text-sm font-medium text-white">Henüz rezervasyon yok</h3>
+                  <p className="mt-1 text-sm text-white/60">
+                    İlk rezervasyonunuzu yapmak için butona tıklayın.
+                  </p>
+                  <div className="mt-6">
+                    <Link 
+                      href="/reservation"
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 inline-flex items-center space-x-2"
+                    >
+                      <Plus className="h-5 w-5" />
+                      <span>Rezervasyon Yap</span>
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </motion.div>
       </div>

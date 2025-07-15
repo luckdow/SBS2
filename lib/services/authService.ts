@@ -331,4 +331,51 @@ export class AuthService {
       throw error;
     }
   }
+
+  // Calculate customer statistics from reservations
+  static calculateCustomerStats(reservations: any[]): any {
+    if (!reservations || reservations.length === 0) {
+      return {
+        totalTrips: 0,
+        totalSpent: 0,
+        loyaltyPoints: 0,
+        membershipLevel: 'Bronze',
+        avgRating: 0,
+        savedAmount: 0
+      };
+    }
+
+    const completedReservations = reservations.filter(r => r.status === 'completed');
+    const totalSpent = completedReservations.reduce((sum, r) => sum + (r.totalPrice || r.price || 0), 0);
+    const totalTrips = completedReservations.length;
+    const loyaltyPoints = Math.floor(totalSpent / 10); // 1 point per 10 TL spent
+    
+    // Determine membership level based on total spent
+    let membershipLevel = 'Bronze';
+    if (totalSpent >= 10000) {
+      membershipLevel = 'Platinum';
+    } else if (totalSpent >= 5000) {
+      membershipLevel = 'Gold';
+    } else if (totalSpent >= 2000) {
+      membershipLevel = 'Silver';
+    }
+
+    // Calculate average rating (if available)
+    const ratedReservations = completedReservations.filter(r => r.rating);
+    const avgRating = ratedReservations.length > 0 
+      ? ratedReservations.reduce((sum, r) => sum + r.rating, 0) / ratedReservations.length 
+      : 5.0;
+
+    // Calculate estimated savings (mock calculation)
+    const savedAmount = Math.floor(totalSpent * 0.15); // Assume 15% savings
+
+    return {
+      totalTrips,
+      totalSpent,
+      loyaltyPoints,
+      membershipLevel,
+      avgRating: Math.round(avgRating * 10) / 10,
+      savedAmount
+    };
+  }
 }
