@@ -39,6 +39,148 @@ import PaymentStep from '../../components/ui/PaymentStep';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 import ErrorBoundary, { GoogleMapsErrorBoundary } from '../../components/common/ErrorBoundary';
 
+// Rota Adımı Bileşeni
+function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; disabled?: boolean }) {
+  const [formData, setFormData] = useState({
+    direction: 'airport-to-hotel',
+    hotelLocation: '',
+    date: '',
+    time: '',
+    passengers: 1,
+    baggage: 1,
+  });
+
+  // Rota çizimi için tam 'place' nesnesini saklamak üzere state oluşturuldu.
+  const [hotelPlace, setHotelPlace] = useState<google.maps.places.PlaceResult | undefined>();
+
+  const getFromLocation = () => formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
+  const getToLocation = () => formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı';
+
+  // Bu fonksiyon, hem metin değerini hem de tam 'place' nesnesini alır.
+  const handleHotelLocationChange = (value: string, place?: google.maps.places.PlaceResult) => {
+    setFormData({ ...formData, hotelLocation: value });
+    
+    // Eğer kullanıcı listeden geçerli bir yer seçtiyse, 'place' nesnesini state'e kaydet.
+    if (place && place.geometry) {
+      setHotelPlace(place);
+    } else {
+      // Eğer kullanıcı sadece metin yazıyorsa veya seçim geçersizse, 'place' nesnesini temizle.
+      setHotelPlace(undefined);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Butonun aktif olması için artık 'hotelPlace' nesnesinin varlığı kontrol ediliyor.
+    if (!hotelPlace) {
+      toast.error("Lütfen listeden geçerli bir konum seçin.");
+      return;
+    }
+    const submitData = { 
+      ...formData, 
+      from: getFromLocation(), 
+      to: getToLocation(), 
+      distance: 25, // Bu değer 2. adımda güncellenecek
+      estimatedDuration: '30 dakika', 
+      hotelPlace: hotelPlace // Rota çizimi için tam 'place' nesnesini bir sonraki adıma aktar
+    };
+    onNext(submitData);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="space-y-8">
+      <div className="text-center">
+        <h2 className="text-3xl font-bold text-white mb-3">Rota Seçimi</h2>
+        <p className="text-white/70 text-lg">Transfer yönünüzü seçin ve otel bilgilerinizi girin</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="space-y-4">
+          <label className="block text-lg font-semibold text-white">Transfer Yönü</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <label className="relative group cursor-pointer">
+              <input type="radio" name="direction" value="airport-to-hotel" checked={formData.direction === 'airport-to-hotel'} onChange={(e) => setFormData({ ...formData, direction: e.target.value })} className="sr-only" />
+              <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${formData.direction === 'airport-to-hotel' ? 'border-blue-500 bg-blue-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
+                <div className="flex items-center space-x-4">
+                  <div className={`p-3 rounded-xl ${formData.direction === 'airport-to-hotel' ? 'bg-blue-500' : 'bg-white/20'}`}><Plane className="h-6 w-6 text-white" /></div>
+                  <div>
+                    <span className="font-semibold text-white text-lg">Havalimanı → Otel</span>
+                    <p className="text-white/70 text-sm">Karşılama hizmeti ile</p>
+                  </div>
+                </div>
+              </div>
+            </label>
+            <label className="relative group cursor-pointer">
+              <input type="radio" name="direction" value="hotel-to-airport" checked={formData.direction === 'hotel-to-airport'} onChange={(e) => setFormData({ ...formData, direction: e.target.value })} className="sr-only" />
+              <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${formData.direction === 'hotel-to-airport' ? 'border-purple-500 bg-purple-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
+                <div className="flex items-center space-x-4">
+                  <div className={`p-3 rounded-xl ${formData.direction === 'hotel-to-airport' ? 'bg-purple-500' : 'bg-white/20'}`}><Plane className="h-6 w-6 text-white transform rotate-180" /></div>
+                  <div>
+                    <span className="font-semibold text-white text-lg">Otel → Havalimanı</span>
+                    <p className="text-white/70 text-sm">Zamanında ulaşım</p>
+                  </div>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <label className="block text-lg font-semibold text-white">{formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}</label>
+          <GoogleMapsErrorBoundary>
+            <HybridAddressInput 
+              value={formData.hotelLocation} 
+              onChange={handleHotelLocationChange} 
+              placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'} 
+            />
+          </GoogleMapsErrorBoundary>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Tarih</label>
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50" required />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Saat</label>
+            <div className="relative">
+              <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input type="time" value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50" required />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Yolcu Sayısı</label>
+            <div className="relative">
+              <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input type="number" min="1" max="8" value={formData.passengers} onChange={(e) => setFormData({ ...formData, passengers: parseInt(e.target.value) })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/50" required />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-lg font-semibold text-white">Bagaj Sayısı</label>
+            <div className="relative">
+              <Luggage className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
+              <input type="number" min="0" max="10" value={formData.baggage} onChange={(e) => setFormData({ ...formData, baggage: parseInt(e.target.value) })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/50" required />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end pt-4">
+          <button 
+            type="submit" 
+            disabled={!hotelPlace || disabled} 
+            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2"
+          >
+            <span>Devam Et</span>
+            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
+          </button>
+        </div>
+      </form>
+    </motion.div>
+  );
+}
+
 // Ana Rezervasyon Sayfası Bileşeni
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -53,46 +195,22 @@ export default function ReservationPage() {
 
   const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
 
-  // KESİN ÇÖZÜM: Adım geçişi fonksiyonu
-  // Bu fonksiyon, adım değiştirmeden ÖNCE proaktif olarak tüm Google Haritalar
-  // DOM elemanlarını temizleyerek "removeChild" hatasını kökünden çözer.
-  const safeSetCurrentStep = useCallback(async (newStep: number) => {
+  const safeSetCurrentStep = useCallback((newStep: number) => {
     if (isTransitioning || !isMountedRef.current) return;
-
     setIsTransitioning(true);
-
-    // 1. Önce proaktif olarak tüm Google Haritalar elemanlarını temizle.
-    await GoogleMapsService.forceCleanupAllGoogleMapsElements();
-
-    // 2. DOM'un güncellenmesi ve React'in durumu sindirmesi için kısa bir gecikme ver.
+    setCurrentStep(newStep);
     setTimeout(() => {
-      if (!isMountedRef.current) {
+      if (isMountedRef.current) {
         setIsTransitioning(false);
-        return;
       }
-      // 3. Adımı değiştir.
-      setCurrentStep(newStep);
-
-      // 4. Geçiş animasyonunun bitmesi için bekle.
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          setIsTransitioning(false);
-        }
-      }, 50);
-    }, 50);
-
+    }, 300);
   }, [isTransitioning, currentStep]);
 
-
-  // Bileşen yüklendiğinde verileri çek ve kaldırıldığında temizlik yap.
   useEffect(() => {
     isMountedRef.current = true;
     loadVehiclesAndServices();
-
     return () => {
       isMountedRef.current = false;
-      console.log('🧹 Reservation page: Component kaldırılıyor, son temizlik yapılıyor...');
-      GoogleMapsService.forceCleanupAllGoogleMapsElements();
     };
   }, []);
 
@@ -154,7 +272,6 @@ export default function ReservationPage() {
     }
   };
 
-  // Yedek veriler
   const mockVehicles = [
     { id: '1', name: 'Ekonomi Sedan', capacity: 4, baggage: 2, pricePerKm: 8, image: 'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Temiz Araç', 'Sigara İçilmez', 'Bluetooth'], rating: 4.2, gradient: 'from-blue-400 to-blue-600' },
     { id: '2', name: 'Konfor SUV', capacity: 6, baggage: 4, pricePerKm: 12, image: 'https://images.pexels.com/photos/463174/pexels-photo-463174.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Geniş İç Mekan', 'USB Şarj', 'Wi-Fi', 'Deri Koltuk'], rating: 4.7, gradient: 'from-purple-400 to-purple-600' },
@@ -299,119 +416,6 @@ export default function ReservationPage() {
         </div>
       </div>
     </ErrorBoundary>
-  );
-}
-
-// Rota Adımı Bileşeni
-function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; disabled?: boolean }) {
-  const [formData, setFormData] = useState({
-    direction: 'airport-to-hotel',
-    hotelLocation: '',
-    date: '',
-    time: '',
-    passengers: 1,
-    baggage: 1,
-  });
-
-  const [hotelPlace, setHotelPlace] = useState<google.maps.places.PlaceResult | undefined>();
-
-  const getFromLocation = () => formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
-  const getToLocation = () => formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı';
-
-  const handleHotelLocationChange = (value: string, place?: google.maps.places.PlaceResult) => {
-    setFormData({ ...formData, hotelLocation: value });
-    setHotelPlace(place);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const submitData = { ...formData, from: getFromLocation(), to: getToLocation(), distance: 25, estimatedDuration: '30 dakika', hotelPlace: hotelPlace };
-    onNext(submitData);
-  };
-
-  return (
-    <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="space-y-8">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold text-white mb-3">Rota Seçimi</h2>
-        <p className="text-white/70 text-lg">Transfer yönünüzü seçin ve otel bilgilerinizi girin</p>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="space-y-4">
-          <label className="block text-lg font-semibold text-white">Transfer Yönü</label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <label className="relative group cursor-pointer">
-              <input type="radio" name="direction" value="airport-to-hotel" checked={formData.direction === 'airport-to-hotel'} onChange={(e) => setFormData({ ...formData, direction: e.target.value })} className="sr-only" />
-              <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${formData.direction === 'airport-to-hotel' ? 'border-blue-500 bg-blue-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
-                <div className="flex items-center space-x-4">
-                  <div className={`p-3 rounded-xl ${formData.direction === 'airport-to-hotel' ? 'bg-blue-500' : 'bg-white/20'}`}><Plane className="h-6 w-6 text-white" /></div>
-                  <div>
-                    <span className="font-semibold text-white text-lg">Havalimanı → Otel</span>
-                    <p className="text-white/70 text-sm">Karşılama hizmeti ile</p>
-                  </div>
-                </div>
-              </div>
-            </label>
-            <label className="relative group cursor-pointer">
-              <input type="radio" name="direction" value="hotel-to-airport" checked={formData.direction === 'hotel-to-airport'} onChange={(e) => setFormData({ ...formData, direction: e.target.value })} className="sr-only" />
-              <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${formData.direction === 'hotel-to-airport' ? 'border-purple-500 bg-purple-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
-                <div className="flex items-center space-x-4">
-                  <div className={`p-3 rounded-xl ${formData.direction === 'hotel-to-airport' ? 'bg-purple-500' : 'bg-white/20'}`}><Plane className="h-6 w-6 text-white transform rotate-180" /></div>
-                  <div>
-                    <span className="font-semibold text-white text-lg">Otel → Havalimanı</span>
-                    <p className="text-white/70 text-sm">Zamanında ulaşım</p>
-                  </div>
-                </div>
-              </div>
-            </label>
-          </div>
-        </div>
-        <div className="space-y-4">
-          <label className="block text-lg font-semibold text-white">{formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}</label>
-          <GoogleMapsErrorBoundary>
-            <HybridAddressInput value={formData.hotelLocation} onChange={handleHotelLocationChange} placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'} />
-          </GoogleMapsErrorBoundary>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Tarih</label>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50" required />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Saat</label>
-            <div className="relative">
-              <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input type="time" value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50" required />
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Yolcu Sayısı</label>
-            <div className="relative">
-              <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input type="number" min="1" max="8" value={formData.passengers} onChange={(e) => setFormData({ ...formData, passengers: parseInt(e.target.value) })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/50" required />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-lg font-semibold text-white">Bagaj Sayısı</label>
-            <div className="relative">
-              <Luggage className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60" />
-              <input type="number" min="0" max="10" value={formData.baggage} onChange={(e) => setFormData({ ...formData, baggage: parseInt(e.target.value) })} className="w-full pl-12 pr-4 py-4 bg-white/10 border border-white/30 rounded-xl text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/50" required />
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end pt-4">
-          <button type="submit" disabled={!formData.hotelLocation || disabled} className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2">
-            <span>Devam Et</span>
-            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
-          </button>
-        </div>
-      </form>
-    </motion.div>
   );
 }
 
