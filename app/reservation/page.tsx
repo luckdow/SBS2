@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, 
@@ -37,6 +37,7 @@ import HybridAddressInput from '../../components/ui/HybridAddressInput';
 import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import PaymentStep from '../../components/ui/PaymentStep';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
+import ErrorBoundary, { GoogleMapsErrorBoundary } from '../../components/common/ErrorBoundary';
 
 export default function ReservationPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -47,52 +48,81 @@ export default function ReservationPage() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Add isMounted ref to prevent state updates on unmounted components
+  const isMountedRef = useRef(true);
 
   const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
 
-  // Safe step transition with enhanced debouncing and Google Maps cleanup to prevent DOM conflicts
+  // Enhanced safe step transition with better error handling and DOM cleanup
   const safeSetCurrentStep = React.useCallback(async (newStep: number) => {
-    if (isTransitioning) return;
+    if (isTransitioning || !isMountedRef.current) return;
     
     setIsTransitioning(true);
     
     try {
-      // Enhanced Google Maps cleanup before step transition
-      await GoogleMapsService.safeStepTransitionCleanup(150);
+      console.log(`🔄 Transitioning from step ${currentStep} to step ${newStep}`);
       
-      // Increased delay to allow current components to cleanup properly, especially Google Maps
+      // Enhanced Google Maps cleanup before step transition
+      await GoogleMapsService.safeStepTransitionCleanup(200);
+      
+      // Additional delay to allow current components to cleanup properly
       setTimeout(async () => {
         try {
+          // Check if component is still mounted
+          if (!isMountedRef.current) return;
+          
           // Additional cleanup right before step change
           await GoogleMapsService.forceCleanupAllGoogleMapsElements();
           
           setCurrentStep(newStep);
           
-          // Increased timeout to allow new step to initialize properly
+          // Extended timeout to allow new step to initialize properly
           setTimeout(() => {
-            setIsTransitioning(false);
-          }, 500); // Increased from 300ms to 500ms
+            if (isMountedRef.current) {
+              setIsTransitioning(false);
+            }
+          }, 600); // Increased from 500ms to 600ms
         } catch (error) {
           console.warn('Step transition error (non-critical):', error);
-          setCurrentStep(newStep);
-          setIsTransitioning(false);
+          if (isMountedRef.current) {
+            setCurrentStep(newStep);
+            setIsTransitioning(false);
+          }
         }
-      }, 250); // Increased from 100ms to 250ms
+      }, 300); // Increased from 250ms to 300ms
     } catch (error) {
       console.warn('Pre-transition cleanup error (non-critical):', error);
       // Fallback to original behavior if enhanced cleanup fails
       setTimeout(() => {
-        setCurrentStep(newStep);
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 500);
-      }, 250);
+        if (isMountedRef.current) {
+          setCurrentStep(newStep);
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setIsTransitioning(false);
+            }
+          }, 600);
+        }
+      }, 300);
     }
-  }, [isTransitioning]);
+  }, [isTransitioning, currentStep]);
 
   // Load vehicles and services when component mounts
   React.useEffect(() => {
+    isMountedRef.current = true;
     loadVehiclesAndServices();
+    
+    return () => {
+      isMountedRef.current = false;
+      console.log('🧹 Reservation page: Component unmounting, cleaning up...');
+      
+      // Enhanced cleanup on unmount
+      try {
+        GoogleMapsService.safeStepTransitionCleanup(50);
+      } catch (error) {
+        console.warn('Reservation page unmount cleanup error (non-critical):', error);
+      }
+    };
   }, []);
 
   const loadVehiclesAndServices = async () => {
@@ -359,7 +389,12 @@ export default function ReservationPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <ErrorBoundary 
+      onError={(error, errorInfo) => {
+        console.error('Reservation Page Error:', error, errorInfo);
+      }}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -462,13 +497,15 @@ export default function ReservationPage() {
             </div>
 
             {/* Step Content with Enhanced AnimatePresence */}
-            <AnimatePresence mode="wait" initial={false}>
-              {currentStep === 1 && <RouteStep key="route-step-1" onNext={handleRouteNext} disabled={isTransitioning} />}
-              {currentStep === 2 && <VehicleStep key="vehicle-step-2" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => safeSetCurrentStep(1)} disabled={isTransitioning} />}
-              {currentStep === 3 && <CustomerInfoStep key="customer-step-3" onNext={handleCustomerNext} onBack={() => safeSetCurrentStep(2)} disabled={isTransitioning} />}
-              {currentStep === 4 && <PaymentStep key="payment-step-4" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => safeSetCurrentStep(3)} disabled={isTransitioning} />}
-              {currentStep === 5 && <ConfirmationStep key="confirmation-step-5" reservationData={reservationData} qrCode={qrCode} />}
-            </AnimatePresence>
+            <GoogleMapsErrorBoundary>
+              <AnimatePresence mode="wait" initial={false}>
+                {currentStep === 1 && <RouteStep key="route-step-1" onNext={handleRouteNext} disabled={isTransitioning} />}
+                {currentStep === 2 && <VehicleStep key="vehicle-step-2" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => safeSetCurrentStep(1)} disabled={isTransitioning} />}
+                {currentStep === 3 && <CustomerInfoStep key="customer-step-3" onNext={handleCustomerNext} onBack={() => safeSetCurrentStep(2)} disabled={isTransitioning} />}
+                {currentStep === 4 && <PaymentStep key="payment-step-4" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => safeSetCurrentStep(3)} disabled={isTransitioning} />}
+                {currentStep === 5 && <ConfirmationStep key="confirmation-step-5" reservationData={reservationData} qrCode={qrCode} />}
+              </AnimatePresence>
+            </GoogleMapsErrorBoundary>
 
             {/* Transition Loading Overlay */}
             {isTransitioning && (
@@ -490,6 +527,7 @@ export default function ReservationPage() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
 
@@ -621,11 +659,13 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           <label className="block text-lg font-semibold text-white">
             {formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}
           </label>
-          <HybridAddressInput
-            value={formData.hotelLocation}
-            onChange={handleHotelLocationChange}
-            placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'}
-          />
+          <GoogleMapsErrorBoundary>
+            <HybridAddressInput
+              value={formData.hotelLocation}
+              onChange={handleHotelLocationChange}
+              placeholder={formData.direction === 'airport-to-hotel' ? 'Otel adını yazın...' : 'Kalkış yerini yazın...'}
+            />
+          </GoogleMapsErrorBoundary>
         </div>
 
 
@@ -803,13 +843,15 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
       {/* Route Information */}
       {reservationData?.from && reservationData?.to && (
         <div className="space-y-4">
-          <HybridRouteDisplay 
-            origin={reservationData.from}
-            destination={reservationData.to}
-            originPlace={reservationData.direction === 'hotel-to-airport' ? reservationData.hotelPlace : undefined}
-            destinationPlace={reservationData.direction === 'airport-to-hotel' ? reservationData.hotelPlace : undefined}
-            onRouteCalculated={handleRouteCalculated}
-          />
+          <GoogleMapsErrorBoundary>
+            <HybridRouteDisplay 
+              origin={reservationData.from}
+              destination={reservationData.to}
+              originPlace={reservationData.direction === 'hotel-to-airport' ? reservationData.hotelPlace : undefined}
+              destinationPlace={reservationData.direction === 'airport-to-hotel' ? reservationData.hotelPlace : undefined}
+              onRouteCalculated={handleRouteCalculated}
+            />
+          </GoogleMapsErrorBoundary>
           {routeCalculated && (
             <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-3">
               <p className="text-green-200 text-sm text-center">

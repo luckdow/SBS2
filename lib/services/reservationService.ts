@@ -111,10 +111,17 @@ export const reservationService = {
     });
   },
 
-  // Update reservation status
+  // Update reservation status with document existence check
   async updateReservationStatus(reservationId: string, status: Reservation['status'], driverId?: string): Promise<void> {
     try {
       const reservationRef = doc(db, 'reservations', reservationId);
+      
+      // Check if document exists before updating
+      const reservationDoc = await getDoc(reservationRef);
+      if (!reservationDoc.exists()) {
+        throw new Error(`No document to update: projects/${db.app.options.projectId}/databases/(default)/documents/reservations/${reservationId}`);
+      }
+      
       const updateData: any = {
         status,
         updatedAt: Timestamp.now()
@@ -125,8 +132,18 @@ export const reservationService = {
       }
       
       await updateDoc(reservationRef, updateData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating reservation:', error);
+      
+      // Handle specific Firestore errors with user-friendly messages
+      if (error.message.includes('No document to update')) {
+        throw new Error('Rezervasyon bulunamadı. Rezervasyon silinmiş olabilir.');
+      } else if (error.code === 'permission-denied') {
+        throw new Error('Bu işlem için yetkiniz bulunmamaktadır.');
+      } else if (error.code === 'unavailable') {
+        throw new Error('Veritabanı geçici olarak kullanılamıyor. Lütfen tekrar deneyin.');
+      }
+      
       throw error;
     }
   },

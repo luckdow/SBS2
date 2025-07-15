@@ -492,25 +492,40 @@ export class GoogleMapsService {
   // Force cleanup all Google Maps elements from DOM to prevent removeChild errors
   static forceCleanupAllGoogleMapsElements(): void {
     try {
-      // Find and safely remove all Google Maps related elements that might be stuck in DOM
+      // More comprehensive selector list for Google Maps elements
       const selectors = [
         '.pac-container', // Autocomplete dropdown containers
         '.gm-style', // Google Maps style containers
-        '[class*="gm-"]', // Any element with gm- class prefix
+        '.gm-style-cc', // Copyright containers
+        '.gm-style-mtc', // Map type controls
+        '.gm-bundled-control', // Bundled controls
+        '.gm-svpc', // Street view pegman controls
+        '.gm-fullscreen-control', // Fullscreen controls
+        '[class^="gm-"]', // Any element with gm- class prefix
+        '[class*="gm-"]', // Any element with gm- class anywhere
         '[id*="gmap"]', // Any element with gmap id
         '.pac-item', // Autocomplete items
-        '.pac-matched' // Autocomplete matched text
+        '.pac-matched', // Autocomplete matched text
+        '.pac-icon', // Autocomplete icons
+        '.pac-logo', // Autocomplete logo
+        '[class*="pac-"]', // Any element with pac- class
+        '.google-maps', // Custom google maps classes
+        '[data-testid*="map"]', // Test ID based selectors
+        '[aria-label*="Map"]' // Accessibility based selectors
       ];
 
+      // Process each selector separately to prevent one failure from affecting others
       selectors.forEach(selector => {
         try {
           const elements = document.querySelectorAll(selector);
-          elements.forEach(element => {
+          elements.forEach((element, index) => {
             try {
-              // Use defensive DOM removal
-              this.safeRemoveElement(element as HTMLElement);
+              // Add delay between removals to prevent rapid DOM mutations
+              setTimeout(() => {
+                this.safeRemoveElement(element as HTMLElement);
+              }, index * 10); // 10ms delay between each element
             } catch (error) {
-              console.warn(`Could not remove Google Maps element with selector ${selector}:`, error);
+              console.warn(`Could not remove Google Maps element ${index} with selector ${selector}:`, error);
             }
           });
         } catch (error) {
@@ -518,53 +533,86 @@ export class GoogleMapsService {
         }
       });
 
-      // Additional cleanup for any orphaned Google Maps elements
-      this.cleanupOrphanedGoogleMapsElements();
+      // Additional cleanup for orphaned Google Maps elements
+      setTimeout(() => {
+        this.cleanupOrphanedGoogleMapsElements();
+      }, 200); // Allow removals to complete first
     } catch (error) {
       console.warn('Force cleanup of Google Maps elements failed (non-critical):', error);
     }
   }
 
-  // Defensive DOM element removal to prevent removeChild errors
+  // Enhanced defensive DOM element removal to prevent removeChild errors
   static safeRemoveElement(element: HTMLElement): void {
     try {
       if (!element) return;
 
-      // Multiple safe removal strategies
-      
-      // Strategy 1: Use modern remove() method if available
+      // Check if element is still in the DOM
+      if (!element.isConnected) {
+        return; // Element already removed
+      }
+
+      // Strategy 1: Use modern remove() method if available  
       if (typeof element.remove === 'function') {
         try {
-          element.remove();
-          return;
+          // Double-check element is still connected before removal
+          if (element.isConnected) {
+            element.remove();
+            return;
+          }
         } catch (removeError) {
           console.warn('Modern remove() failed, trying parentNode approach:', removeError);
         }
       }
 
-      // Strategy 2: Use parentNode.removeChild with validation
+      // Strategy 2: Use parentNode.removeChild with extensive validation
       if (element.parentNode) {
         try {
-          // Validate parent-child relationship before removal
-          if (element.parentNode.contains(element)) {
-            element.parentNode.removeChild(element);
-            return;
-          } else {
-            console.warn('Element is not a child of its reported parent - DOM inconsistency detected');
+          // Multiple validation checks to prevent "not a child" errors
+          const parent = element.parentNode;
+          
+          // Check if parent still exists and is connected
+          if (parent && parent.isConnected) {
+            // Verify parent-child relationship using multiple methods
+            const isChild = parent.contains(element);
+            const nodeListCheck = Array.from(parent.childNodes).includes(element);
+            
+            if (isChild && nodeListCheck) {
+              parent.removeChild(element);
+              return;
+            } else {
+              console.warn('Element-parent relationship validation failed - DOM state inconsistent');
+            }
           }
         } catch (parentError) {
           console.warn('parentNode.removeChild failed:', parentError);
         }
       }
 
-      // Strategy 3: Try to clear element content as fallback
+      // Strategy 3: Try to clear element content and attributes as fallback
       try {
         if (element.isConnected) {
+          // Clear content and attributes to minimize impact
           element.innerHTML = '';
-          element.remove?.();
+          element.style.display = 'none';
+          
+          // Try remove again after clearing
+          if (typeof element.remove === 'function') {
+            element.remove();
+          }
         }
       } catch (contentError) {
         console.warn('Element content clearing failed:', contentError);
+      }
+
+      // Strategy 4: Mark for garbage collection (last resort)
+      try {
+        // Set references to null to help garbage collection
+        (element as any).innerHTML = null;
+        (element as any).parentNode = null;
+        (element as any).remove = null;
+      } catch (gcError) {
+        console.warn('Garbage collection marking failed:', gcError);
       }
     } catch (error) {
       console.warn('All removal strategies failed for element (non-critical):', error);
@@ -614,20 +662,45 @@ export class GoogleMapsService {
     }
   }
 
-  // Enhanced cleanup with step transition safety
+  // Enhanced cleanup with step transition safety and better error handling
   static async safeStepTransitionCleanup(additionalDelay: number = 100): Promise<void> {
     try {
+      // Phase 1: Prepare for cleanup
+      console.log('🧹 Starting Google Maps step transition cleanup...');
+      
       // Force cleanup all Google Maps elements
       this.forceCleanupAllGoogleMapsElements();
       
       // Wait for cleanup to complete
       await new Promise(resolve => setTimeout(resolve, additionalDelay));
       
-      // Double-check and cleanup any remaining elements
+      // Phase 2: Second pass cleanup for any remaining elements
+      console.log('🧹 Second pass cleanup...');
       this.forceCleanupAllGoogleMapsElements();
       
-      // Additional wait for DOM to stabilize
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Phase 3: Wait for DOM to stabilize
+      await new Promise(resolve => setTimeout(resolve, Math.max(50, additionalDelay / 2)));
+      
+      // Phase 4: Final validation and cleanup
+      console.log('🧹 Final validation...');
+      const remainingElements = document.querySelectorAll('.gm-style, .pac-container, [class*="gm-"]');
+      if (remainingElements.length > 0) {
+        console.warn(`⚠️ ${remainingElements.length} Google Maps elements still remain after cleanup`);
+        
+        // Force removal of remaining elements with additional safety
+        remainingElements.forEach((element, index) => {
+          setTimeout(() => {
+            try {
+              this.safeRemoveElement(element as HTMLElement);
+            } catch (error) {
+              console.warn('Final cleanup removal failed (non-critical):', error);
+            }
+          }, index * 20);
+        });
+      } else {
+        console.log('✅ Google Maps cleanup completed successfully');
+      }
+      
     } catch (error) {
       console.warn('Step transition cleanup failed (non-critical):', error);
     }
