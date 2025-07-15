@@ -334,6 +334,111 @@ export class RealTimeDriverService {
   }
 }
 
+// Real-time Vehicle Service  
+export class RealTimeVehicleService {
+  private collectionName = 'vehicles';
+
+  async getAll(): Promise<Vehicle[]> {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
+    }
+
+    try {
+      const querySnapshot = await getDocs(collection(db, this.collectionName));
+      const vehicles = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date()
+      })) as Vehicle[];
+      
+      console.log('✅ Vehicles loaded from Firebase:', vehicles.length);
+      return vehicles;
+    } catch (error) {
+      console.error('❌ Error loading vehicles:', error);
+      throw new Error('Failed to load vehicles. Please try again.');
+    }
+  }
+
+  async create(vehicleData: any): Promise<string> {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
+    }
+
+    try {
+      const docRef = await addDoc(collection(db, this.collectionName), {
+        ...vehicleData,
+        createdAt: serverTimestamp(),
+        isActive: vehicleData.isActive !== undefined ? vehicleData.isActive : true
+      });
+      
+      console.log('✅ Vehicle created in Firebase:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('❌ Error creating vehicle:', error);
+      throw new Error('Failed to create vehicle. Please try again.');
+    }
+  }
+
+  async update(vehicleId: string, updateData: any): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
+    }
+
+    try {
+      const vehicleRef = doc(db, this.collectionName, vehicleId);
+      await updateDoc(vehicleRef, updateData);
+      
+      console.log('✅ Vehicle updated in Firebase:', vehicleId);
+    } catch (error) {
+      console.error('❌ Error updating vehicle:', error);
+      throw new Error('Failed to update vehicle. Please try again.');
+    }
+  }
+
+  async delete(vehicleId: string): Promise<void> {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
+    }
+
+    try {
+      const vehicleRef = doc(db, this.collectionName, vehicleId);
+      await deleteDoc(vehicleRef);
+      
+      console.log('✅ Vehicle deleted from Firebase:', vehicleId);
+    } catch (error) {
+      console.error('❌ Error deleting vehicle:', error);
+      throw new Error('Failed to delete vehicle. Please try again.');
+    }
+  }
+
+  async getActiveVehicles(): Promise<Vehicle[]> {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not configured. Please check your Firebase configuration.');
+    }
+
+    try {
+      const q = query(
+        collection(db, this.collectionName),
+        where('isActive', '==', true)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const vehicles = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date()
+      })) as Vehicle[];
+      
+      console.log('✅ Active vehicles loaded:', vehicles.length);
+      return vehicles;
+    } catch (error) {
+      console.error('❌ Error loading active vehicles:', error);
+      throw new Error('Failed to load active vehicles. Please try again.');
+    }
+  }
+}
+
 // Export service instances
 export const realTimeReservationService = new RealTimeReservationService();
 export const realTimeDriverService = new RealTimeDriverService();
+export const realTimeVehicleService = new RealTimeVehicleService();
