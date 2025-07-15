@@ -5,6 +5,8 @@ import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
 interface GoogleMapsAutocompleteProps {
   // Bu bileşen artık kendi input değerini yönettiği için 'value' prop'una ihtiyacı yok.
+  // Sadece başlangıç değeri ve değişiklikleri bildirmek için 'defaultValue' ve 'onChange' kullanır.
+  defaultValue?: string;
   onChange: (value: string, place?: google.maps.places.PlaceResult) => void;
   placeholder: string;
   className?: string;
@@ -12,6 +14,7 @@ interface GoogleMapsAutocompleteProps {
 }
 
 export default function GoogleMapsAutocomplete({
+  defaultValue = '',
   onChange,
   placeholder,
   className = '',
@@ -32,20 +35,17 @@ export default function GoogleMapsAutocomplete({
 
     const place = autocompleteRef.current.getPlace();
     if (!place.geometry || !place.geometry.location) {
-      // Eğer kullanıcı listeden seçmek yerine sadece yazıp Enter'a basarsa,
-      // place nesnesi eksik olabilir. Bu durumda input'taki metni kullanırız.
       if (inputRef.current) {
         onChange(inputRef.current.value, undefined);
       }
       return;
     }
     
-    // Kullanıcı listeden geçerli bir yer seçti.
     const address = place.formatted_address || place.name || '';
     if (inputRef.current) {
-      inputRef.current.value = address; // Input'u seçilen adresle güncelle.
+      inputRef.current.value = address;
     }
-    onChange(address, place); // Hem metni hem de tüm 'place' nesnesini yukarıya gönder.
+    onChange(address, place);
   }, [onChange, handleError]);
 
   useEffect(() => {
@@ -87,15 +87,14 @@ export default function GoogleMapsAutocomplete({
       clearTimeout(timer);
       isMountedRef.current = false;
       
-      // KESİN TEMİZLİK: Google'ın öneri kutusunu manuel olarak kaldır.
       const pacContainers = document.querySelectorAll('.pac-container');
       pacContainers.forEach(container => {
         try {
-          if (document.body.contains(container)) {
-            document.body.removeChild(container);
-          }
+            if (document.body.contains(container)) {
+                document.body.removeChild(container);
+            }
         } catch (e) {
-          // Bu hatayı görmezden gel, eleman zaten kaldırılmış olabilir.
+            // Bu hatayı görmezden gel, eleman zaten kaldırılmış olabilir.
         }
       });
 
@@ -107,10 +106,10 @@ export default function GoogleMapsAutocomplete({
 
   return (
     <div className="relative w-full">
-      {/* Bu input artık kendi değerini yönetiyor, bu da önerilerin anında gelmesini sağlıyor. */}
       <input
         ref={inputRef}
         type="text"
+        defaultValue={defaultValue} // Dışarıdan gelen değeri sadece başlangıçta kullan
         onChange={(e) => onChange(e.target.value, undefined)} // Kullanıcı yazarken sadece metni güncelle
         placeholder={placeholder}
         className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all border-white/30 focus:border-blue-500 focus:ring-blue-500/50 ${className}`}
