@@ -549,7 +549,7 @@ export default function ReservationPage() {
     // Bu, "removeChild" hatasının ana çözümüdür. 
     // `safeStepTransitionCleanup` fonksiyonunu daha önce oluşturduğumuz 
     // `GoogleMapsService` içinden çağırıyoruz.
-    await GoogleMapsService.safeStepTransitionCleanup();
+    GoogleMapsService.forceCleanupAllGoogleMapsElements();
 
     // Temizlik bittikten sonra mevcut adımı güncelle
     setCurrentStep(newStep);
