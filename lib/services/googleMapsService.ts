@@ -9,7 +9,7 @@ export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
   private static librariesPromise: Promise<void> | null = null;
 
-  // *** DÜZELTME: API anahtarı için standart ve doğru değişken adı kullanıldı ***
+  // *** FİNAL DÜZELTME: API anahtarı için standart ve doğru değişken adı kullanıldı ***
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
 
   /**
@@ -54,7 +54,7 @@ export class GoogleMapsService {
       }
 
       if (!this.apiKey) {
-        // *** DÜZELTME: Hata mesajı doğru değişken adına göre güncellendi ***
+        // *** FİNAL DÜZELTME: Hata mesajı doğru değişken adına göre güncellendi ***
         const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini .env.local dosyanıza ve Vercel ayarlarına ekleyin.';
         console.error(errorMsg);
         return reject(new Error(errorMsg));
@@ -75,7 +75,8 @@ export class GoogleMapsService {
       
       const script = document.createElement('script');
       script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&loading=async&language=tr&region=TR`;
+      // *** FİNAL DÜZELTME: importLibrary fonksiyonunu içeren BETA versiyonu istenir ***
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&v=beta&loading=async&language=tr&region=TR`;
       script.async = true;
       
       script.onload = () => {
@@ -83,8 +84,8 @@ export class GoogleMapsService {
         this.loadLibraries().then(() => resolve(window.google)).catch(reject);
       };
       
-      script.onerror = () => {
-        console.error('❌ Google Haritalar scripti yüklenemedi.');
+      script.onerror = (e) => {
+        console.error('❌ Google Haritalar scripti yüklenemedi.', e);
         this.loadPromise = null;
         document.getElementById(scriptId)?.remove();
         reject(new Error('Google Haritalar scripti yüklenemedi.'));
@@ -97,9 +98,7 @@ export class GoogleMapsService {
   }
 
   /**
-   * *** YENİ: ROTA HESAPLAMA FONKSİYONU (getDirections) ***
    * İki nokta arasında yol tarifi, mesafe ve süre bilgilerini hesaplar.
-   * Bu fonksiyon 'getDirections' does not exist hatasını çözer.
    */
   static async getDirections(origin: string | google.maps.LatLng, destination: string | google.maps.LatLng): Promise<google.maps.DirectionsResult> {
     await this.loadGoogleMaps(); // API'nin ve kütüphanelerin yüklendiğinden emin ol
@@ -148,7 +147,7 @@ export class GoogleMapsService {
     const elements = document.querySelectorAll(selectors);
 
     if (elements.length > 0) {
-      elements.forEach((container, index) => {
+      elements.forEach((container) => {
         this.safeRemoveElement(container as HTMLElement);
       });
       console.log(`✅ ${elements.length} adet Google Maps elementi temizlendi.`);
