@@ -13,6 +13,7 @@ export class GoogleMapsService {
 
   /**
    * Google Maps API script'ini, eğer daha önce yüklenmediyse, güvenli bir şekilde sayfaya ekler.
+   * Yeni PlaceAutocompleteElement web component'i desteği ile güncellenmiştir.
    */
   static loadGoogleMaps(): Promise<typeof window.google> {
     if (this.loadPromise) {
@@ -44,7 +45,8 @@ export class GoogleMapsService {
       
       const script = document.createElement('script');
       script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry&language=tr&region=TR`;
+      // PlaceAutocompleteElement web component'i için &loading=async parametresi eklendi
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry&loading=async&language=tr&region=TR`;
       script.async = true;
       script.defer = true;
       
@@ -80,11 +82,11 @@ export class GoogleMapsService {
   }
 
   /**
-   * Google'ın otomatik olarak oluşturduğu adres öneri kutularını (.pac-container) güvenli bir şekilde temizler.
+   * PlaceAutocompleteElement web component'i için güvenli temizlik fonksiyonu.
    */
   static forceCleanupAllGoogleMapsElements(): void {
     if (typeof window === 'undefined') return;
-    const selectors = ['.pac-container'];
+    const selectors = ['.pac-container', 'gmp-place-autocomplete'];
     console.log(`🧹 Google Maps temizliği başlatılıyor...`);
     selectors.forEach(selector => {
         const elements = document.querySelectorAll(selector);
@@ -93,6 +95,26 @@ export class GoogleMapsService {
         }
     });
     console.log('✅ Google Maps temizliği tamamlandı.');
+  }
+
+  /**
+   * Yeni PlaceAutocompleteElement web component'ini güvenli bir şekilde yapılandırır
+   */
+  static configurePlaceAutocompleteElement(element: any): void {
+    try {
+      // TR ülke kısıtlaması
+      element.componentRestrictions = { country: ['tr'] };
+      
+      // İstenen alanlar
+      element.fields = ['place_id', 'geometry', 'name', 'formatted_address', 'types'];
+      
+      // Tip kısıtlamaları
+      element.types = ['establishment', 'geocode'];
+      
+      console.log('✅ PlaceAutocompleteElement yapılandırıldı');
+    } catch (error) {
+      console.warn('PlaceAutocompleteElement yapılandırılırken hata:', error);
+    }
   }
 
   /**

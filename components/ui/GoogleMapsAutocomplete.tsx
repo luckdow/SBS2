@@ -11,6 +11,15 @@ interface GoogleMapsAutocompleteProps {
   onStatusChange?: (status: 'loading' | 'error' | 'success', message?: string) => void;
 }
 
+// Type for PlaceAutocompleteElement
+interface PlaceAutocompleteElement extends HTMLElement {
+  placeholder: string;
+  value: string;
+  componentRestrictions: { country: string[] };
+  fields: string[];
+  types: string[];
+}
+
 export default function GoogleMapsAutocomplete({
   defaultValue = '',
   onChange,
@@ -18,8 +27,8 @@ export default function GoogleMapsAutocomplete({
   className = '',
   onStatusChange
 }: GoogleMapsAutocompleteProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const autocompleteElementRef = useRef<PlaceAutocompleteElement | null>(null);
   const isMountedRef = useRef(true);
 
   const handleError = useCallback((errorMessage: string) => {
@@ -28,22 +37,30 @@ export default function GoogleMapsAutocomplete({
     onStatusChange?.('error', errorMessage);
   }, [onStatusChange]);
 
-  const handlePlaceSelect = useCallback(() => {
-    if (!isMountedRef.current || !autocompleteRef.current) return;
+  const handlePlaceSelect = useCallback((event: any) => {
+    if (!isMountedRef.current) return;
 
-    const place = autocompleteRef.current.getPlace();
+    const place = event.detail?.place;
+    if (!place) {
+      console.warn('Seçilen yer bilgisi bulunamadı');
+      return;
+    }
+
     if (!place.geometry || !place.geometry.location) {
-      if (inputRef.current) {
-        onChange(inputRef.current.value, undefined);
-      }
+      // Eğer geometrik bilgi yoksa, sadece metin değerini al
+      const inputValue = place.name || place.formatted_address || defaultValue || '';
+      onChange(inputValue, undefined);
       return;
     }
     
     const address = place.formatted_address || place.name || '';
-    if (inputRef.current) {
-      inputRef.current.value = address;
-    }
     onChange(address, place);
+  }, [onChange, defaultValue]);
+
+  const handleInput = useCallback((event: any) => {
+    if (!isMountedRef.current) return;
+    const value = event.target.value || '';
+    onChange(value, undefined);
   }, [onChange]);
 
   useEffect(() => {
@@ -51,25 +68,57 @@ export default function GoogleMapsAutocomplete({
     let isInitialized = false;
 
     const initialize = async () => {
-      if (!inputRef.current || !isMountedRef.current || isInitialized) return;
+      if (!containerRef.current || !isMountedRef.current || isInitialized) return;
       
       isInitialized = true;
       onStatusChange?.('loading');
 
       try {
-        // `window.google` objesini merkezi servisimizden güvenli bir şekilde alıyoruz.
-        const google = await GoogleMapsService.loadGoogleMaps();
-        if (!isMountedRef.current || !inputRef.current) return;
+        // Google Maps API'sini yükle
+        await GoogleMapsService.loadGoogleMaps();
+        if (!isMountedRef.current || !containerRef.current) return;
 
-        // Autocomplete'i `google.maps.places.Autocomplete` olarak çağırıyoruz.
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-          componentRestrictions: { country: ['tr'] },
-          fields: ['place_id', 'geometry', 'name', 'formatted_address', 'types'],
-          types: ['establishment', 'geocode'],
-        });
+        // PlaceAutocompleteElement web component'ini oluştur
+        const autocompleteElement = document.createElement('gmp-place-autocomplete') as PlaceAutocompleteElement;
+        
+        // Placeholder ayarla
+        autocompleteElement.placeholder = placeholder;
+        
+        // Varsayılan değer ayarla
+        if (defaultValue) {
+          autocompleteElement.value = defaultValue;
+        }
+        
+        // TR ülke kısıtlaması - doğrudan property olarak ayarla
+        autocompleteElement.componentRestrictions = { country: ['tr'] };
+        
+        // İstenen alanlar - doğrudan property olarak ayarla
+        autocompleteElement.fields = ['place_id', 'geometry', 'name', 'formatted_address', 'types'];
+        
+        // Tip kısıtlamaları - doğrudan property olarak ayarla
+        autocompleteElement.types = ['establishment', 'geocode'];
 
-        autocompleteRef.current = autocomplete;
-        autocomplete.addListener('place_changed', handlePlaceSelect);
+        // Temel stil ayarları
+        autocompleteElement.style.cssText = `
+          width: 100%;
+          --gmp-place-autocomplete-font-family: inherit;
+          --gmp-place-autocomplete-font-size: inherit;
+        `;
+
+        // CSS variables ile stil özelleştirme
+        autocompleteElement.style.setProperty('--gmp-place-autocomplete-background-color', 'transparent');
+        autocompleteElement.style.setProperty('--gmp-place-autocomplete-color', 'white');
+        autocompleteElement.style.setProperty('--gmp-place-autocomplete-placeholder-color', 'rgba(255, 255, 255, 0.6)');
+        autocompleteElement.style.setProperty('--gmp-place-autocomplete-border', 'none');
+        autocompleteElement.style.setProperty('--gmp-place-autocomplete-outline', 'none');
+
+        // Event listener'ları ekle
+        autocompleteElement.addEventListener('gmp-placeselect', handlePlaceSelect);
+        autocompleteElement.addEventListener('input', handleInput);
+
+        // DOM'a ekle
+        containerRef.current.appendChild(autocompleteElement);
+        autocompleteElementRef.current = autocompleteElement;
 
         if (isMountedRef.current) {
           onStatusChange?.('success');
@@ -83,36 +132,32 @@ export default function GoogleMapsAutocomplete({
 
     const timer = setTimeout(() => initialize(), 50);
 
-    // *** ANA DÜZELTME: GÜVENLİ TEMİZLİK ***
     return () => {
       clearTimeout(timer);
       isMountedRef.current = false;
       
-      // Hatanın ana kaynağı olan manuel DOM silme işlemini TAMAMEN KALDIRIYORUZ.
-      // Bu işi artık `app/reservation/page.tsx` içindeki merkezi temizlik fonksiyonu yapıyor.
-      
-      // Burada sadece Google'a ait event listener'ları temizliyoruz.
-      // Bu işlem hafıza sızıntılarını önler ve %100 güvenlidir.
-      if (autocompleteRef.current && window.google?.maps?.event) {
+      // PlaceAutocompleteElement temizliği
+      if (autocompleteElementRef.current) {
         try {
-          window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+          // Event listener'ları temizle
+          autocompleteElementRef.current.removeEventListener('gmp-placeselect', handlePlaceSelect);
+          autocompleteElementRef.current.removeEventListener('input', handleInput);
+          
+          // Element'i DOM'dan güvenli şekilde kaldır
+          GoogleMapsService.safeRemoveElement(autocompleteElementRef.current);
         } catch (e) {
-          // Bu hata genellikle önemli değildir ve güvenle göz ardı edilebilir.
-          console.warn("Autocomplete listener'ları temizlenirken hata oluştu (genellikle önemsiz):", e);
+          console.warn("PlaceAutocompleteElement temizlenirken hata oluştu (genellikle önemsiz):", e);
         }
       }
     };
-  }, [handlePlaceSelect, handleError, onStatusChange]);
+  }, [handlePlaceSelect, handleInput, handleError, onStatusChange, placeholder, defaultValue]);
 
   return (
     <div className="relative w-full">
-      <input
-        ref={inputRef}
-        type="text"
-        defaultValue={defaultValue}
-        onChange={(e) => onChange(e.target.value, undefined)}
-        placeholder={placeholder}
-        className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus:ring-2 transition-all border-white/30 focus:border-blue-500 focus:ring-blue-500/50 ${className}`}
+      <div 
+        ref={containerRef}
+        className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border rounded-xl text-white placeholder-white/60 focus-within:ring-2 transition-all border-white/30 focus-within:border-blue-500 focus-within:ring-blue-500/50 ${className}`}
+        style={{ minHeight: '56px' }}
       />
     </div>
   );
