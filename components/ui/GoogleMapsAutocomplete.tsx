@@ -173,7 +173,7 @@ export default function GoogleMapsAutocomplete({
     };
   }, [initializeAutocomplete]);
 
-  // Enhanced cleanup autocomplete on unmount with defensive DOM operations
+  // Enhanced cleanup autocomplete on unmount and when initializeAutocomplete changes
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
@@ -187,7 +187,7 @@ export default function GoogleMapsAutocomplete({
         }, 'Autocomplete component cleanup', undefined);
       }
     };
-  }, []);
+  }, [initializeAutocomplete]);
 
   // Sync input value for legacy autocomplete only
   useEffect(() => {
