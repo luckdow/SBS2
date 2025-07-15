@@ -32,7 +32,8 @@ import QRCode from 'qrcode';
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
-import { vehicleService, serviceService } from '../../lib/services/api';
+import { vehicleService } from '../../lib/services/vehicleService';
+import { serviceService } from '../../lib/services/serviceService';
 import HybridAddressInput from '../../components/ui/HybridAddressInput';
 import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import PaymentStep from '../../components/ui/PaymentStep';
@@ -126,11 +127,14 @@ export default function ReservationPage() {
   }, []);
 
   const loadVehiclesAndServices = async () => {
+    if (!isMountedRef.current) return;
+    
     setLoadingVehicles(true);
     setLoadingServices(true);
     
     try {
-      // Load vehicles from admin panel
+      // Enhanced vehicle loading with improved reliability
+      console.log('🚗 Loading vehicles from service...');
       const vehiclesData = await vehicleService.getAll();
       const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
       const processedVehicles = activeVehicles.map(vehicle => ({
@@ -138,44 +142,61 @@ export default function ReservationPage() {
         gradient: getVehicleGradient(vehicle.type || 'sedan')
       }));
       
-      // Use mock data if no vehicles are found
-      if (processedVehicles.length === 0) {
-        console.log('No vehicles found in database, using mock data');
-        setVehicles(mockVehicles);
-      } else {
-        setVehicles(processedVehicles);
+      if (isMountedRef.current) {
+        if (processedVehicles.length === 0) {
+          console.log('No active vehicles found, using mock data');
+          toast('Henüz aktif araç bulunmuyor - örnek araçlar gösteriliyor', {
+            icon: 'ℹ️',
+            duration: 4000
+          });
+          setVehicles(mockVehicles);
+        } else {
+          console.log(`✅ Loaded ${processedVehicles.length} active vehicles`);
+          setVehicles(processedVehicles);
+        }
       }
     } catch (error) {
       console.error('Error loading vehicles:', error);
-      // Fallback to mock data
-      setVehicles(mockVehicles);
+      if (isMountedRef.current) {
+        // Enhanced error handling with user-friendly toast
+        toast.error('Araç verileri yüklenirken hata oluştu - örnek araçlar gösteriliyor');
+        setVehicles(mockVehicles);
+      }
     } finally {
-      setLoadingVehicles(false);
+      if (isMountedRef.current) {
+        setLoadingVehicles(false);
+      }
     }
 
     try {
-      // Load services from admin panel
-      const servicesData = await serviceService.getAll();
-      const activeServices = servicesData.filter(service => service.isActive !== false);
-      const processedServices = activeServices.map(service => ({
-        ...service,
-        icon: getServiceIcon(service.category || 'extra'),
-        gradient: getServiceGradient(service.category || 'extra')
-      }));
+      // Enhanced service loading with improved reliability  
+      console.log('🛎️ Loading services from service...');
+      const servicesData = await serviceService.getProcessedServices();
       
-      // Use mock data if no services are found
-      if (processedServices.length === 0) {
-        console.log('No services found in database, using mock data');
-        setServices(mockServices);
-      } else {
-        setServices(processedServices);
+      if (isMountedRef.current) {
+        if (servicesData.length === 0) {
+          console.log('No active services found, using mock data');
+          toast('Henüz aktif hizmet bulunmuyor - örnek hizmetler gösteriliyor', {
+            icon: 'ℹ️',
+            duration: 4000
+          });
+          setServices(mockServices);
+        } else {
+          console.log(`✅ Loaded ${servicesData.length} active services`);
+          setServices(servicesData);
+        }
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      // Fallback to mock data
-      setServices(mockServices);
+      if (isMountedRef.current) {
+        // Enhanced error handling with user-friendly toast
+        toast.error('Hizmet verileri yüklenirken hata oluştu - örnek hizmetler gösteriliyor');
+        setServices(mockServices);
+      }
     } finally {
-      setLoadingServices(false);
+      if (isMountedRef.current) {
+        setLoadingServices(false);
+      }
     }
   };
 
