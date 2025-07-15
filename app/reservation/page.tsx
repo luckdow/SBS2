@@ -258,19 +258,21 @@ export default function ReservationPage() {
 
   const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
 
+  // *** DÜZELTME ***: Fonksiyon 'async' yapıldı ve temizlik çağrısı eklendi.
   const safeSetCurrentStep = useCallback(async (newStep: number) => {
     if (isTransitioning || !isMountedRef.current) return;
     
     setIsTransitioning(true);
 
-    // Adım değişmeden önce Google Haritalar'dan kalan elementleri temizliyoruz.
-    // Bu, "removeChild" hatasını önlemek için en önemli adımdır.
+    // Harita içeren bir adımdan ayrılırken, DOM'daki harita elementlerini güvenli bir şekilde temizle.
+    // Bu, bir sonraki adımda haritanın düzgün yüklenmesini sağlar ve "removeChild" hatasını önler.
     if (currentStep === 1 || currentStep === 2) {
       await GoogleMapsService.safeStepTransitionCleanup();
     }
 
     setCurrentStep(newStep);
     
+    // Animasyonun tamamlanması için bekleme süresi eklendi.
     setTimeout(() => {
       if (isMountedRef.current) {
         setIsTransitioning(false);
