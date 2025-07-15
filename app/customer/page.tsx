@@ -46,6 +46,46 @@ export default function CustomerDashboard() {
   // Add isMounted ref to prevent state updates on unmounted components
   const isMountedRef = useRef(true);
 
+  // Mock reservations data defined before hooks
+  const mockReservations = [
+    {
+      id: 'RES001',
+      from: 'Antalya Havalimanı',
+      to: 'Lara Beach Hotel',
+      date: '2024-01-15',
+      time: '14:30',
+      status: 'completed',
+      driver: 'Mehmet Şoför',
+      vehicle: 'Mercedes E-Class',
+      price: 280,
+      rating: 5,
+      createdAt: new Date('2024-01-15')
+    },
+    {
+      id: 'RES002',
+      from: 'Kemer Marina',
+      to: 'Antalya Havalimanı',
+      date: '2024-01-20',
+      time: '16:00',
+      status: 'started',
+      driver: 'Ali Şoför',
+      vehicle: 'BMW X5',
+      price: 320,
+      createdAt: new Date('2024-01-20')
+    },
+    {
+      id: 'RES003',
+      from: 'Side Antik Tiyatro',
+      to: 'Belek Golf Resort',
+      date: '2024-01-25',
+      time: '18:15',
+      status: 'pending',
+      vehicle: 'Audi A6',
+      price: 180,
+      createdAt: new Date('2024-01-25')
+    }
+  ];
+
   useEffect(() => {
     isMountedRef.current = true;
     const checkAuth = async () => {
@@ -85,6 +125,11 @@ export default function CustomerDashboard() {
       isMountedRef.current = false;
     };
   }, [router]);
+
+  // Load reservations data - placed before conditional returns to follow React hooks rules
+  useEffect(() => {
+    setReservations(mockReservations);
+  }, []);
 
   const handleSignOut = async () => {
     if (!isMountedRef.current) return;
@@ -136,50 +181,6 @@ export default function CustomerDashboard() {
     memberSince: new Date(currentUser.createdAt).toLocaleDateString('tr-TR'),
     avatar: (currentUser as any).avatar || null
   };
-
-  // Mock reservations
-  const mockReservations = [
-    {
-      id: 'RES001',
-      from: 'Antalya Havalimanı',
-      to: 'Lara Beach Hotel',
-      date: '2024-01-15',
-      time: '14:30',
-      status: 'completed',
-      driver: 'Mehmet Şoför',
-      vehicle: 'Mercedes E-Class',
-      price: 280,
-      rating: 5,
-      createdAt: new Date('2024-01-15')
-    },
-    {
-      id: 'RES002',
-      from: 'Kemer Marina',
-      to: 'Antalya Havalimanı',
-      date: '2024-01-20',
-      time: '16:00',
-      status: 'started',
-      driver: 'Ali Şoför',
-      vehicle: 'BMW X5',
-      price: 320,
-      createdAt: new Date('2024-01-20')
-    },
-    {
-      id: 'RES003',
-      from: 'Side Antik Tiyatro',
-      to: 'Belek Golf Resort',
-      date: '2024-01-25',
-      time: '18:15',
-      status: 'pending',
-      vehicle: 'Audi A6',
-      price: 180,
-      createdAt: new Date('2024-01-25')
-    }
-  ];
-
-  useEffect(() => {
-    setReservations(mockReservations);
-  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
