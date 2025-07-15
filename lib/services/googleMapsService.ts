@@ -3,13 +3,13 @@
  *
  * Bu servis, Google Maps JavaScript API'sini yüklemek ve yönetmek için merkezi ve güvenilir bir yapı sunar.
  * Temel amacı, API'nin uygulama boyunca yalnızca bir kez yüklenmesini sağlamak ve React component'ları
- * arasında geçiş yaparken ortaya çıkan "removeChild" gibi DOM hatalarını kesin olarak önlemektir.
+ * arasında geçiş yaparken ortaya çıkan DOM hatalarını kesin olarak önlemektir.
  */
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
   private static librariesPromise: Promise<void> | null = null;
 
-  // *** DÜZELTME: API anahtarı için standart değişken adı kullanıldı ***
+  // *** DÜZELTME: API anahtarı için standart ve doğru değişken adı kullanıldı ***
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
 
   /**
@@ -24,11 +24,12 @@ export class GoogleMapsService {
       try {
         await google.maps.importLibrary("places");
         await google.maps.importLibrary("geometry");
-        console.log('✅ Google Maps "places" ve "geometry" kütüphaneleri başarıyla yüklendi.');
+        await google.maps.importLibrary("routes"); // Rota çizimi için gerekli
+        console.log('✅ Google Maps "places", "geometry" ve "routes" kütüphaneleri başarıyla yüklendi.');
       } catch (e) {
         console.error('❌ Google Maps kütüphaneleri yüklenemedi:', e);
         this.librariesPromise = null;
-        throw new Error('Gerekli Google Haritalar kütüphaneleri (places, geometry) yüklenemedi.');
+        throw new Error('Gerekli Google Haritalar kütüphaneleri yüklenemedi.');
       }
     })();
     
@@ -53,7 +54,7 @@ export class GoogleMapsService {
       }
 
       if (!this.apiKey) {
-        // *** DÜZELTME: Hata mesajı standart değişken adına göre güncellendi ***
+        // *** DÜZELTME: Hata mesajı doğru değişken adına göre güncellendi ***
         const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini .env.local dosyanıza ve Vercel ayarlarına ekleyin.';
         console.error(errorMsg);
         return reject(new Error(errorMsg));
@@ -96,7 +97,37 @@ export class GoogleMapsService {
   }
 
   /**
-   * Bir elementi DOM'dan kaldırmadan önce varlığını ve geçerli bir ebeveyne sahip olduğunu kontrol eder.
+   * *** YENİ: ROTA HESAPLAMA FONKSİYONU (getDirections) ***
+   * İki nokta arasında yol tarifi, mesafe ve süre bilgilerini hesaplar.
+   * Bu fonksiyon 'getDirections' does not exist hatasını çözer.
+   */
+  static async getDirections(origin: string | google.maps.LatLng, destination: string | google.maps.LatLng): Promise<google.maps.DirectionsResult> {
+    await this.loadGoogleMaps(); // API'nin ve kütüphanelerin yüklendiğinden emin ol
+    
+    const directionsService = new google.maps.DirectionsService();
+
+    return new Promise((resolve, reject) => {
+      directionsService.route(
+        {
+          origin: origin,
+          destination: destination,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            console.log('✅ Rota başarıyla hesaplandı:', result);
+            resolve(result);
+          } else {
+            console.error(`❌ Rota hesaplanamadı, durum: ${status}`);
+            reject(new Error(`Directions isteği başarısız oldu: ${status}`));
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * Bir elementi DOM'dan güvenle kaldırır.
    */
   static safeRemoveElement(element: HTMLElement | null) {
     if (element && element.parentNode) {
@@ -109,39 +140,30 @@ export class GoogleMapsService {
   }
 
   /**
-   * Sayfadaki tüm Google Maps ile ilgili arayüz elemanlarını güvenli bir şekilde temizler.
-   * Bu, özellikle component'lar arası geçişlerde "ghost" elementlerin kalmasını ve hataları önler.
-   * *** İYİLEŞTİRME: Daha fazla olası element için seçici eklendi (.gmnoprint gibi) ***
+   * Sayfadaki tüm Google Maps ile ilgili arayüz elemanlarını temizler.
    */
   static forceCleanupAllGoogleMapsElements() {
     console.log('🧹 Google Maps temizliği başlatılıyor...');
     const selectors = '.pac-container, .gmnoprint';
     const elements = document.querySelectorAll(selectors);
 
-    if (elements.length === 0) {
-      console.log(`ℹ️ Temizlenecek Google Maps elementi (${selectors}) bulunamadı.`);
-      return;
+    if (elements.length > 0) {
+      elements.forEach((container, index) => {
+        this.safeRemoveElement(container as HTMLElement);
+      });
+      console.log(`✅ ${elements.length} adet Google Maps elementi temizlendi.`);
+    } else {
+      console.log('ℹ️ Temizlenecek Google Maps elementi bulunamadı.');
     }
-
-    elements.forEach((container, index) => {
-      console.log(`[${index + 1}/${elements.length}] "${container.className}" bulundu, kaldırılıyor...`);
-      this.safeRemoveElement(container as HTMLElement);
-    });
-    console.log(`✅ ${elements.length} adet Google Maps elementi başarıyla temizlendi.`);
   }
 
   /**
-   * *** YENİ: ADIM GEÇİŞLERİ İÇİN GÜVENLİ TEMİZLİK FONKSİYONU ***
-   * Bu fonksiyon, component adımları arasında geçiş yapmadan hemen önce çağrılmalıdır.
-   * DOM'u stabilize etmek için Google Haritalar öğelerini temizler ve kısa bir gecikme ekler.
-   * Bu, "removeChild" hatasının ana çözümüdür.
-   * @param delay - Temizlik sonrası beklenecek milisaniye cinsinden süre.
+   * Adım geçişleri için güvenli temizlik fonksiyonu.
    */
   static async safeStepTransitionCleanup(delay = 200): Promise<void> {
     console.log(`🧹 Güvenli adım geçişi temizliği başlatılıyor (${delay}ms gecikme ile)...`);
     this.forceCleanupAllGoogleMapsElements();
     
-    // DOM'un ve React'in güncellenmesi için kısa bir bekleme süresi tanır.
     return new Promise(resolve => setTimeout(resolve, delay));
   }
 }
