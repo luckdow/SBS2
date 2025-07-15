@@ -46,6 +46,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [stats, setStats] = useState({
     totalReservations: 24,
     pendingReservations: 8,
@@ -294,14 +295,14 @@ export default function AdminDashboard() {
               <Database className="h-5 w-5" />
               <span>Veritabanını Sıfırla</span>
             </Link>
-            <button className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2">
+            <Link href="/reservation" className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2">
               <Plus className="h-5 w-5" />
               <span>Yeni Rezervasyon</span>
-            </button>
-            <button className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-6 py-3 rounded-xl hover:bg-white/20 transition-all duration-300 flex items-center space-x-2">
+            </Link>
+            <Link href="/admin/settings" className="bg-white/10 backdrop-blur-md border border-white/30 text-white px-6 py-3 rounded-xl hover:bg-white/20 transition-all duration-300 flex items-center space-x-2">
               <Settings className="h-5 w-5" />
               <span>Ayarlar</span>
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -605,7 +606,13 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                        <button className="bg-white/10 backdrop-blur-md border border-white/30 text-white p-2 rounded-lg hover:bg-white/20 transition-all duration-300">
+                        <button 
+                          onClick={() => {
+                            setSelectedReservation(reservation);
+                            setShowDetailsModal(true);
+                          }}
+                          className="bg-white/10 backdrop-blur-md border border-white/30 text-white p-2 rounded-lg hover:bg-white/20 transition-all duration-300"
+                        >
                           <Eye className="h-4 w-4" />
                         </button>
                         {reservation.status === 'pending' && (
@@ -693,6 +700,140 @@ export default function AdminDashboard() {
                   >
                     İptal
                   </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Reservation Details Modal */}
+        <AnimatePresence>
+          {showDetailsModal && selectedReservation && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-white flex items-center space-x-2">
+                    <Eye className="h-6 w-6" />
+                    <span>Rezervasyon Detayları - #{selectedReservation.id}</span>
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setSelectedReservation(null);
+                    }}
+                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Customer Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-white">Müşteri Bilgileri</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <Users className="h-5 w-5 text-blue-400" />
+                          <div>
+                            <p className="text-white font-medium">Ad Soyad</p>
+                            <p className="text-white/70">{selectedReservation.firstName} {selectedReservation.lastName}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Phone className="h-5 w-5 text-green-400" />
+                          <div>
+                            <p className="text-white font-medium">Telefon</p>
+                            <p className="text-white/70">{selectedReservation.phone}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Mail className="h-5 w-5 text-yellow-400" />
+                          <div>
+                            <p className="text-white font-medium">E-posta</p>
+                            <p className="text-white/70">{selectedReservation.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-white">Yolculuk Bilgileri</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <MapPin className="h-5 w-5 text-green-400" />
+                          <div>
+                            <p className="text-white font-medium">Nereden</p>
+                            <p className="text-white/70">{selectedReservation.from}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <MapPin className="h-5 w-5 text-red-400" />
+                          <div>
+                            <p className="text-white font-medium">Nereye</p>
+                            <p className="text-white/70">{selectedReservation.to}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Calendar className="h-5 w-5 text-blue-400" />
+                          <div>
+                            <p className="text-white font-medium">Tarih & Saat</p>
+                            <p className="text-white/70">{selectedReservation.date} - {selectedReservation.time}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Users className="h-5 w-5 text-purple-400" />
+                          <div>
+                            <p className="text-white font-medium">Yolcu & Bagaj</p>
+                            <p className="text-white/70">{selectedReservation.passengers} yolcu, {selectedReservation.baggage} bagaj</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vehicle and Price Information */}
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <h4 className="text-lg font-semibold text-white mb-3">Araç ve Fiyat Bilgileri</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-white font-medium">Seçilen Araç</p>
+                        <p className="text-white/70">{selectedReservation.vehicle}</p>
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">Toplam Tutar</p>
+                        <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                          ₺{selectedReservation.totalPrice?.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status and Driver */}
+                  {selectedReservation.assignedDriver && (
+                    <div className="bg-white/5 rounded-xl p-4">
+                      <h4 className="text-lg font-semibold text-white mb-3">Atanan Şoför</h4>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                          <UserCheck className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{selectedReservation.assignedDriver}</p>
+                          <p className="text-white/70">Atanmış Şoför</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </motion.div>

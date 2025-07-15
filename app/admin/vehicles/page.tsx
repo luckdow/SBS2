@@ -22,7 +22,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
-import { vehicleService } from '../../../lib/services/api';
+import { realTimeVehicleService } from '../../../lib/services/realTimeService';
 import { Vehicle } from '../../../lib/types';
 
 export default function AdminVehiclesPage() {
@@ -65,7 +65,7 @@ export default function AdminVehiclesPage() {
     try {
       setLoading(true);
       console.log('🚗 Loading vehicles...');
-      const vehiclesData = await vehicleService.getAll();
+      const vehiclesData = await realTimeVehicleService.getAll();
       console.log('✅ Vehicles loaded:', vehiclesData);
       setVehicles(vehiclesData);
     } catch (error) {
@@ -81,7 +81,7 @@ export default function AdminVehiclesPage() {
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await vehicleService.create(formData);
+      await realTimeVehicleService.create(formData);
       await loadVehicles();
       setShowAddModal(false);
       resetForm();
@@ -96,7 +96,7 @@ export default function AdminVehiclesPage() {
     if (!selectedVehicle) return;
     
     try {
-      await vehicleService.update(selectedVehicle.id, formData);
+      await realTimeVehicleService.update(selectedVehicle.id, formData);
       await loadVehicles();
       setShowEditModal(false);
       resetForm();
@@ -110,7 +110,7 @@ export default function AdminVehiclesPage() {
     if (!confirm('Bu aracı silmek istediğinizden emin misiniz?')) return;
     
     try {
-      await vehicleService.delete(vehicleId);
+      await realTimeVehicleService.delete(vehicleId);
       await loadVehicles();
       toast.success('🗑️ Araç silindi!');
     } catch (error) {
@@ -120,7 +120,7 @@ export default function AdminVehiclesPage() {
 
   const handleToggleActive = async (vehicleId: string, isActive: boolean) => {
     try {
-      await vehicleService.update(vehicleId, { isActive: !isActive });
+      await realTimeVehicleService.update(vehicleId, { isActive: !isActive });
       await loadVehicles();
       toast.success(`✅ Araç ${!isActive ? 'aktif' : 'pasif'} edildi!`);
     } catch (error) {
