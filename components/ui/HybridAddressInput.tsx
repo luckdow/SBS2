@@ -22,7 +22,6 @@ export default function HybridAddressInput({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [showFallback, setShowFallback] = useState(false);
 
-  // Google Maps yüklenemezse kullanılacak yedek öneriler.
   const fallbackSuggestions = [
     'Antalya Havalimanı Terminal 1', 'Antalya Havalimanı Terminal 2', 'Lara Beach Hotel, Antalya',
     'Kemer Marina, Antalya', 'Side Antik Tiyatro, Manavgat', 'Belek Golf Resort, Serik', 'Kaleiçi, Antalya'
@@ -31,21 +30,19 @@ export default function HybridAddressInput({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // GoogleMapsAutocomplete bileşeninden gelen durum değişikliklerini yönetir.
   const handleStatusChange = (status: 'loading' | 'error' | 'success', message?: string) => {
     setGoogleMapsStatus(status);
     if (status === 'error') {
       setErrorMessage(message || 'Bilinmeyen bir hata oluştu.');
-      setShowFallback(true); // Hata durumunda yedek input'u göster.
+      setShowFallback(true);
     } else {
       setShowFallback(false);
     }
   };
 
-  // Yedek input'taki her tuş vuruşunu yönetir.
   const handleFallbackInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    onChange(newValue); // Ana state'i güncelle.
+    onChange(newValue);
     if (newValue) {
       const newSuggestions = fallbackSuggestions.filter(loc => loc.toLowerCase().includes(newValue.toLowerCase()));
       setSuggestions(newSuggestions.slice(0, 5));
@@ -55,23 +52,21 @@ export default function HybridAddressInput({
     }
   };
 
-  // Yedek önerilerden birine tıklandığında çalışır.
   const handleSuggestionClick = (suggestion: string) => {
     onChange(suggestion);
     setShowSuggestions(false);
   };
 
-  // Hata yoksa, Google Maps Autocomplete bileşenini render et.
   if (!showFallback) {
     return (
       <GoogleMapsErrorBoundary>
         <div className="relative">
-          <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60 pointer-events-none" />
+          <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/60 pointer-events-none z-10" />
           {googleMapsStatus === 'loading' && (
-            <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400 animate-spin" />
+            <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400 animate-spin z-10" />
           )}
           <GoogleMapsAutocomplete
-            value={value}
+            defaultValue={value}
             onChange={onChange}
             placeholder={placeholder}
             className={className}
@@ -82,7 +77,6 @@ export default function HybridAddressInput({
     );
   }
 
-  // Hata varsa, yedek manuel giriş arayüzünü render et.
   return (
     <div className="relative">
       <div className="relative">
@@ -92,18 +86,18 @@ export default function HybridAddressInput({
           value={value}
           onChange={handleFallbackInputChange}
           onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Tıklama için gecikme
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           placeholder={placeholder}
           className={`w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border border-red-500/50 rounded-xl text-white placeholder-white/60 focus:border-red-500 focus:ring-2 focus:ring-red-500/50 transition-all ${className}`}
         />
       </div>
 
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-10 w-full mt-2 bg-slate-800/90 backdrop-blur-md border border-white/30 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-20 w-full mt-2 bg-slate-800/90 backdrop-blur-md border border-white/30 rounded-xl shadow-lg max-h-60 overflow-y-auto">
           {suggestions.map((suggestion, index) => (
             <button
               key={`suggestion-${index}`}
-              onMouseDown={() => handleSuggestionClick(suggestion)} // onBlur'dan önce çalışması için onMouseDown
+              onMouseDown={() => handleSuggestionClick(suggestion)}
               className="w-full text-left px-4 py-3 text-white hover:bg-blue-500/20 transition-colors flex items-center space-x-3"
             >
               <MapPin className="h-4 w-4 text-blue-400 flex-shrink-0" />
