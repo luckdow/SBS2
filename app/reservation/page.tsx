@@ -3,28 +3,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar,
-  Clock,
-  Users,
-  Luggage,
-  Plane,
-  MapPin,
-  Star,
-  Check,
-  CheckCircle,
-  Download,
-  Mail,
-  Phone,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  Shield,
-  Car,
-  Navigation,
-  QrCode,
-  CreditCard,
-  Gift,
-  AlertCircle
+  Calendar, Clock, Users, Luggage, Plane, MapPin, Star, Check, CheckCircle,
+  Download, Mail, Phone, ArrowRight, ArrowLeft, Sparkles, Shield, Car,
+  Navigation, QrCode, CreditCard, Gift, AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -241,256 +222,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
         </div>
       </form>
     </motion.div>
-  );
-}
-
-// Ana Rezervasyon Sayfası Bileşeni
-export default function ReservationPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [reservationData, setReservationData] = useState<any>({});
-  const [qrCode, setQrCode] = useState('');
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
-  const [loadingVehicles, setLoadingVehicles] = useState(false);
-  const [loadingServices, setLoadingServices] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const isMountedRef = useRef(true);
-
-  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
-
-  // *** DÜZELTME ***: Fonksiyon 'async' yapıldı ve temizlik çağrısı eklendi.
-  const safeSetCurrentStep = useCallback(async (newStep: number) => {
-    if (isTransitioning || !isMountedRef.current) return;
-    
-    setIsTransitioning(true);
-
-    // Harita içeren bir adımdan ayrılırken, DOM'daki harita elementlerini güvenli bir şekilde temizle.
-    // Bu, bir sonraki adımda haritanın düzgün yüklenmesini sağlar ve "removeChild" hatasını önler.
-    if (currentStep === 1 || currentStep === 2) {
-      await GoogleMapsService.safeStepTransitionCleanup();
-    }
-
-    setCurrentStep(newStep);
-    
-    // Animasyonun tamamlanması için bekleme süresi eklendi.
-    setTimeout(() => {
-      if (isMountedRef.current) {
-        setIsTransitioning(false);
-      }
-    }, 400); 
-  }, [isTransitioning, currentStep]);
-
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    loadVehiclesAndServices();
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  const loadVehiclesAndServices = async () => {
-    if (!isMountedRef.current) return;
-    setLoadingVehicles(true);
-    setLoadingServices(true);
-    try {
-      const vehiclesData = await vehicleService.getAll();
-      const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
-      const processedVehicles = activeVehicles.map(vehicle => ({
-        ...vehicle,
-        gradient: getVehicleGradient(vehicle.type || 'sedan')
-      }));
-      if (isMountedRef.current) {
-        if (processedVehicles.length === 0) {
-          toast('Henüz aktif araç bulunmuyor - örnek araçlar gösteriliyor', { icon: 'ℹ️' });
-          setVehicles(mockVehicles);
-        } else {
-          setVehicles(processedVehicles);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading vehicles:', error);
-      if (isMountedRef.current) {
-        toast.error('Araç verileri yüklenirken hata oluştu.');
-        setVehicles(mockVehicles);
-      }
-    } finally {
-      if (isMountedRef.current) setLoadingVehicles(false);
-    }
-    try {
-      const servicesData = await serviceService.getProcessedServices();
-      if (isMountedRef.current) {
-        if (servicesData.length === 0) {
-          toast('Henüz aktif hizmet bulunmuyor - örnek hizmetler gösteriliyor', { icon: 'ℹ️' });
-          setServices(mockServices);
-        } else {
-          setServices(servicesData);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading services:', error);
-      if (isMountedRef.current) {
-        toast.error('Hizmet verileri yüklenirken hata oluştu.');
-        setServices(mockServices);
-      }
-    } finally {
-      if (isMountedRef.current) setLoadingServices(false);
-    }
-  };
-
-  const getVehicleGradient = (type: string) => {
-    switch (type) {
-      case 'sedan': return 'from-blue-400 to-blue-600';
-      case 'suv': return 'from-purple-400 to-purple-600';
-      case 'van': return 'from-yellow-400 to-orange-500';
-      default: return 'from-gray-400 to-gray-600';
-    }
-  };
-
-  const mockVehicles = [
-    { id: '1', name: 'Ekonomi Sedan', capacity: 4, baggage: 2, pricePerKm: 8, image: 'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Temiz Araç', 'Sigara İçilmez', 'Bluetooth'], rating: 4.2, gradient: 'from-blue-400 to-blue-600' },
-    { id: '2', name: 'Konfor SUV', capacity: 6, baggage: 4, pricePerKm: 12, image: 'https://images.pexels.com/photos/463174/pexels-photo-463174.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Geniş İç Mekan', 'USB Şarj', 'Wi-Fi', 'Deri Koltuk'], rating: 4.7, gradient: 'from-purple-400 to-purple-600' },
-    { id: '3', name: 'Premium Van', capacity: 8, baggage: 6, pricePerKm: 15, image: 'https://images.pexels.com/photos/1335077/pexels-photo-1335077.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Deri Koltuk', 'Mini Bar', 'Wi-Fi', 'TV', 'Masaj'], rating: 4.9, gradient: 'from-yellow-400 to-orange-500' }
-  ];
-  const mockServices = [
-    { id: '1', name: 'Bebek Koltuğu', price: 50, description: '0-4 yaş arası çocuklar için', icon: Gift, gradient: 'from-pink-400 to-pink-600' },
-    { id: '2', name: 'Çocuk Koltuğu', price: 40, description: '4-12 yaş arası çocuklar için', icon: Users, gradient: 'from-green-400 to-green-600' },
-    { id: '3', name: 'Ek Bagaj', price: 30, description: 'Standart üzeri bagaj için', icon: Luggage, gradient: 'from-blue-400 to-blue-600' },
-    { id: '4', name: 'Havalimanı Karşılama', price: 75, description: 'Tabela ile karşılama hizmeti', icon: Plane, gradient: 'from-purple-400 to-purple-600' }
-  ];
-
-  const handleRouteNext = (routeData: any) => {
-    setReservationData(prev => ({ ...prev, ...routeData }));
-    safeSetCurrentStep(2);
-  };
-  const handleVehicleNext = (vehicleData: any) => {
-    setReservationData(prev => ({ ...prev, ...vehicleData }));
-    safeSetCurrentStep(3);
-  };
-  const handleCustomerNext = (customerData: any) => {
-    setReservationData(prev => ({ ...prev, ...customerData }));
-    safeSetCurrentStep(4);
-  };
-  const handlePaymentNext = async (paymentData: any) => {
-    try {
-      const finalData = { ...reservationData, ...paymentData };
-      const reservationId = `RES${Date.now()}`;
-      const reservationWithId = { ...finalData, id: reservationId };
-      const reservationForFirebase = { ...reservationWithId, status: 'pending' as const, qrCode: reservationId, customerId: `customer_${Date.now()}`, firstName: finalData.firstName, lastName: finalData.lastName, email: finalData.email, phone: finalData.phone, flightNumber: finalData.flightNumber || '', specialRequests: finalData.specialRequests || '' };
-      const actualReservationId = await realTimeReservationService.create(reservationForFirebase);
-      const finalReservationData = { ...reservationWithId, id: actualReservationId };
-      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
-      try {
-        const fullName = `${finalData.firstName} ${finalData.lastName}`;
-        const accountResult = await AuthService.createAutoAccount(finalData.email, fullName, finalData.phone);
-        if (accountResult) {
-          finalReservationData.autoAccount = { email: finalData.email, password: accountResult.password, created: true };
-        } else {
-          finalReservationData.autoAccount = { email: finalData.email, created: false, message: 'Hesap zaten mevcut' };
-        }
-      } catch (error) {
-        finalReservationData.autoAccount = { email: finalData.email, created: false, error: 'Hesap oluşturulamadı' };
-      }
-      await EmailService.sendConfirmationEmail(finalReservationData, qrCodeUrl);
-      setQrCode(qrCodeUrl);
-      setReservationData(finalReservationData);
-      safeSetCurrentStep(5);
-      toast.success('🎉 Ödeme tamamlandı! Rezervasyonunuz oluşturuldu!');
-    } catch (error) {
-      toast.error('❌ Ödeme işlemi sırasında hata oluştu.');
-      console.error('Payment/Reservation error:', error);
-    }
-  };
-
-  return (
-    <ErrorBoundary onError={(error, errorInfo) => { console.error('Reservation Page Error:', error, errorInfo); }}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
-          <div className="absolute top-40 left-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-4000"></div>
-        </div>
-        <header className="relative z-10 backdrop-blur-md bg-white/10 border-b border-white/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-xl shadow-lg">
-                    <MapPin className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">SBS TRAVEL</h1>
-                  <p className="text-xs text-blue-200">Premium Transfer</p>
-                </div>
-              </Link>
-              <Link href="/" className="text-white/80 hover:text-white transition-colors flex items-center space-x-2">
-                <ArrowLeft className="h-4 w-4" />
-                <span>Ana Sayfa</span>
-              </Link>
-            </div>
-          </div>
-        </header>
-        <div className="relative z-10 py-12">
-          <div className="text-center mb-8">
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 mb-4">
-                <Sparkles className="h-4 w-4 text-yellow-400" />
-                <span className="text-white/90 text-sm">Premium Rezervasyon</span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-bold mb-2">
-                <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">Transfer Rezervasyonu</span>
-              </h1>
-              <p className="text-white/70 text-lg">4 kolay adımda lüks yolculuğunuzu planlayın</p>
-            </motion.div>
-          </div>
-          <div className="max-w-5xl mx-auto p-6">
-            <div className="bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8">
-              <div className="mb-8">
-                <div className="flex items-center justify-between">
-                  {Array.from({ length: 5 }, (_, index) => (
-                    <React.Fragment key={index}>
-                      <div className="flex flex-col items-center">
-                        <motion.div initial={{ scale: 0.8 }} animate={{ scale: currentStep >= index + 1 ? 1 : 0.8 }} className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm relative ${currentStep >= index + 1 ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg' : 'bg-white/20 text-white/60'}`}>
-                          {currentStep > index + 1 ? (<CheckCircle className="h-6 w-6" />) : (index + 1)}
-                          {currentStep >= index + 1 && (<div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full blur opacity-75 animate-pulse"></div>)}
-                        </motion.div>
-                        <span className={`mt-3 text-sm font-medium ${currentStep >= index + 1 ? 'text-white' : 'text-white/60'}`}>{stepNames[index]}</span>
-                      </div>
-                      {index < 4 && (
-                        <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
-                          <motion.div initial={{ width: '0%' }} animate={{ width: currentStep > index + 1 ? '100%' : '0%' }} className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full" transition={{ duration: 0.5 }} />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-              <GoogleMapsErrorBoundary>
-                <AnimatePresence mode="wait" initial={false}>
-                  {currentStep === 1 && <RouteStep key="route-step-1" onNext={handleRouteNext} disabled={isTransitioning} />}
-                  {currentStep === 2 && <VehicleStep key="vehicle-step-2" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => safeSetCurrentStep(1)} disabled={isTransitioning} />}
-                  {currentStep === 3 && <CustomerInfoStep key="customer-step-3" onNext={handleCustomerNext} onBack={() => safeSetCurrentStep(2)} disabled={isTransitioning} />}
-                  {currentStep === 4 && <PaymentStep key="payment-step-4" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => safeSetCurrentStep(3)} disabled={isTransitioning} />}
-                  {currentStep === 5 && <ConfirmationStep key="confirmation-step-5" reservationData={reservationData} qrCode={qrCode} />}
-                </AnimatePresence>
-              </GoogleMapsErrorBoundary>
-              {isTransitioning && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 rounded-3xl">
-                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-                    <div className="flex items-center space-x-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                      <span className="text-white font-medium">Adım geçişi...</span>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </ErrorBoundary>
   );
 }
 
@@ -782,5 +513,265 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
         {reservationData.autoAccount?.created && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="mt-4 text-center"><p className="text-white/60 text-sm">Hesabınıza giriş yapmak için e-posta adresinizi ve yukarıdaki geçici şifreyi kullanın.</p></motion.div>)}
       </div>
     </motion.div>
+  );
+}
+
+
+// #####################################################################
+// ### ANA REZERVASYON SAYFASI (ASIL DÜZELTME BURADA) ###
+// #####################################################################
+export default function ReservationPage() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [reservationData, setReservationData] = useState<any>({});
+  const [qrCode, setQrCode] = useState('');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const isMountedRef = useRef(true);
+
+  const stepNames = ['Rota Seçimi', 'Araç & Fiyat', 'Kişisel Bilgiler', 'Ödeme & Onay', 'Tamamlandı'];
+
+  // =====================================================================
+  // *** ANA DÜZELTME: GÜVENLİ ADIM GEÇİŞ FONKSİYONU ***
+  // Bu fonksiyon, adımlar arasında geçiş yapmadan hemen önce, 
+  // Google Haritalar'ın oluşturduğu ve hataya sebep olan elemanları
+  // güvenli bir şekilde temizler. Bu sayede "removeChild" hatası engellenir.
+  // =====================================================================
+  const safeSetCurrentStep = useCallback(async (newStep: number) => {
+    // Eğer zaten bir geçiş işlemi devam ediyorsa, tekrar çalıştırma
+    if (isTransitioning || !isMountedRef.current) return;
+    
+    setIsTransitioning(true);
+
+    // BİR SONRAKİ ADIMA GEÇMEDEN ÖNCE harita elemanlarını temizliyoruz.
+    // Bu, "removeChild" hatasının ana çözümüdür. 
+    // `safeStepTransitionCleanup` fonksiyonunu daha önce oluşturduğumuz 
+    // `GoogleMapsService` içinden çağırıyoruz.
+    await GoogleMapsService.safeStepTransitionCleanup();
+
+    // Temizlik bittikten sonra mevcut adımı güncelle
+    setCurrentStep(newStep);
+    
+    // Animasyonun ve React'in kendini toparlaması için kısa bir bekleme
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setIsTransitioning(false);
+      }
+    }, 400); 
+  }, [isTransitioning]); // Bağımlılık olarak sadece 'isTransitioning' yeterli. 'currentStep' gerekmez.
+
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadVehiclesAndServices();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const loadVehiclesAndServices = async () => {
+    if (!isMountedRef.current) return;
+    setLoadingVehicles(true);
+    setLoadingServices(true);
+    try {
+      const vehiclesData = await vehicleService.getAll();
+      const activeVehicles = vehiclesData.filter(vehicle => vehicle.isActive !== false);
+      const processedVehicles = activeVehicles.map(vehicle => ({
+        ...vehicle,
+        gradient: getVehicleGradient(vehicle.type || 'sedan')
+      }));
+      if (isMountedRef.current) {
+        if (processedVehicles.length === 0) {
+          toast('Henüz aktif araç bulunmuyor - örnek araçlar gösteriliyor', { icon: 'ℹ️' });
+          setVehicles(mockVehicles);
+        } else {
+          setVehicles(processedVehicles);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading vehicles:', error);
+      if (isMountedRef.current) {
+        toast.error('Araç verileri yüklenirken hata oluştu.');
+        setVehicles(mockVehicles);
+      }
+    } finally {
+      if (isMountedRef.current) setLoadingVehicles(false);
+    }
+    try {
+      const servicesData = await serviceService.getProcessedServices();
+      if (isMountedRef.current) {
+        if (servicesData.length === 0) {
+          toast('Henüz aktif hizmet bulunmuyor - örnek hizmetler gösteriliyor', { icon: 'ℹ️' });
+          setServices(mockServices);
+        } else {
+          setServices(servicesData);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading services:', error);
+      if (isMountedRef.current) {
+        toast.error('Hizmet verileri yüklenirken hata oluştu.');
+        setServices(mockServices);
+      }
+    } finally {
+      if (isMountedRef.current) setLoadingServices(false);
+    }
+  };
+
+  const getVehicleGradient = (type: string) => {
+    switch (type) {
+      case 'sedan': return 'from-blue-400 to-blue-600';
+      case 'suv': return 'from-purple-400 to-purple-600';
+      case 'van': return 'from-yellow-400 to-orange-500';
+      default: return 'from-gray-400 to-gray-600';
+    }
+  };
+
+  const mockVehicles = [
+    { id: '1', name: 'Ekonomi Sedan', capacity: 4, baggage: 2, pricePerKm: 8, image: 'https://images.pexels.com/photos/120049/pexels-photo-120049.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Temiz Araç', 'Sigara İçilmez', 'Bluetooth'], rating: 4.2, gradient: 'from-blue-400 to-blue-600' },
+    { id: '2', name: 'Konfor SUV', capacity: 6, baggage: 4, pricePerKm: 12, image: 'https://images.pexels.com/photos/463174/pexels-photo-463174.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Geniş İç Mekan', 'USB Şarj', 'Wi-Fi', 'Deri Koltuk'], rating: 4.7, gradient: 'from-purple-400 to-purple-600' },
+    { id: '3', name: 'Premium Van', capacity: 8, baggage: 6, pricePerKm: 15, image: 'https://images.pexels.com/photos/1335077/pexels-photo-1335077.jpeg?auto=compress&cs=tinysrgb&w=400', features: ['Klima', 'Deri Koltuk', 'Mini Bar', 'Wi-Fi', 'TV', 'Masaj'], rating: 4.9, gradient: 'from-yellow-400 to-orange-500' }
+  ];
+  const mockServices = [
+    { id: '1', name: 'Bebek Koltuğu', price: 50, description: '0-4 yaş arası çocuklar için', icon: Gift, gradient: 'from-pink-400 to-pink-600' },
+    { id: '2', name: 'Çocuk Koltuğu', price: 40, description: '4-12 yaş arası çocuklar için', icon: Users, gradient: 'from-green-400 to-green-600' },
+    { id: '3', name: 'Ek Bagaj', price: 30, description: 'Standart üzeri bagaj için', icon: Luggage, gradient: 'from-blue-400 to-blue-600' },
+    { id: '4', name: 'Havalimanı Karşılama', price: 75, description: 'Tabela ile karşılama hizmeti', icon: Plane, gradient: 'from-purple-400 to-purple-600' }
+  ];
+
+  const handleRouteNext = (routeData: any) => {
+    setReservationData(prev => ({ ...prev, ...routeData }));
+    safeSetCurrentStep(2);
+  };
+  const handleVehicleNext = (vehicleData: any) => {
+    setReservationData(prev => ({ ...prev, ...vehicleData }));
+    safeSetCurrentStep(3);
+  };
+  const handleCustomerNext = (customerData: any) => {
+    setReservationData(prev => ({ ...prev, ...customerData }));
+    safeSetCurrentStep(4);
+  };
+  const handlePaymentNext = async (paymentData: any) => {
+    try {
+      const finalData = { ...reservationData, ...paymentData };
+      const reservationId = `RES${Date.now()}`;
+      const reservationWithId = { ...finalData, id: reservationId };
+      const reservationForFirebase = { ...reservationWithId, status: 'pending' as const, qrCode: reservationId, customerId: `customer_${Date.now()}`, firstName: finalData.firstName, lastName: finalData.lastName, email: finalData.email, phone: finalData.phone, flightNumber: finalData.flightNumber || '', specialRequests: finalData.specialRequests || '' };
+      const actualReservationId = await realTimeReservationService.create(reservationForFirebase);
+      const finalReservationData = { ...reservationWithId, id: actualReservationId };
+      const qrCodeUrl = await EmailService.generateQRCode(reservationWithId);
+      try {
+        const fullName = `${finalData.firstName} ${finalData.lastName}`;
+        const accountResult = await AuthService.createAutoAccount(finalData.email, fullName, finalData.phone);
+        if (accountResult) {
+          finalReservationData.autoAccount = { email: finalData.email, password: accountResult.password, created: true };
+        } else {
+          finalReservationData.autoAccount = { email: finalData.email, created: false, message: 'Hesap zaten mevcut' };
+        }
+      } catch (error) {
+        finalReservationData.autoAccount = { email: finalData.email, created: false, error: 'Hesap oluşturulamadı' };
+      }
+      await EmailService.sendConfirmationEmail(finalReservationData, qrCodeUrl);
+      setQrCode(qrCodeUrl);
+      setReservationData(finalReservationData);
+      safeSetCurrentStep(5);
+      toast.success('🎉 Ödeme tamamlandı! Rezervasyonunuz oluşturuldu!');
+    } catch (error) {
+      toast.error('❌ Ödeme işlemi sırasında hata oluştu.');
+      console.error('Payment/Reservation error:', error);
+    }
+  };
+
+  return (
+    <ErrorBoundary onError={(error, errorInfo) => { console.error('Reservation Page Error:', error, errorInfo); }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
+          <div className="absolute top-40 left-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-4000"></div>
+        </div>
+        <header className="relative z-10 backdrop-blur-md bg-white/10 border-b border-white/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="flex items-center space-x-3">
+                <div className="relative">
+                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-xl shadow-lg">
+                    <MapPin className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">SBS TRAVEL</h1>
+                  <p className="text-xs text-blue-200">Premium Transfer</p>
+                </div>
+              </Link>
+              <Link href="/" className="text-white/80 hover:text-white transition-colors flex items-center space-x-2">
+                <ArrowLeft className="h-4 w-4" />
+                <span>Ana Sayfa</span>
+              </Link>
+            </div>
+          </div>
+        </header>
+        <div className="relative z-10 py-12">
+          <div className="text-center mb-8">
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
+              <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 mb-4">
+                <Sparkles className="h-4 w-4 text-yellow-400" />
+                <span className="text-white/90 text-sm">Premium Rezervasyon</span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-2">
+                <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">Transfer Rezervasyonu</span>
+              </h1>
+              <p className="text-white/70 text-lg">4 kolay adımda lüks yolculuğunuzu planlayın</p>
+            </motion.div>
+          </div>
+          <div className="max-w-5xl mx-auto p-6">
+            <div className="bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8">
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <React.Fragment key={index}>
+                      <div className="flex flex-col items-center">
+                        <motion.div initial={{ scale: 0.8 }} animate={{ scale: currentStep >= index + 1 ? 1 : 0.8 }} className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm relative ${currentStep >= index + 1 ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg' : 'bg-white/20 text-white/60'}`}>
+                          {currentStep > index + 1 ? (<CheckCircle className="h-6 w-6" />) : (index + 1)}
+                          {currentStep >= index + 1 && (<div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full blur opacity-75 animate-pulse"></div>)}
+                        </motion.div>
+                        <span className={`mt-3 text-sm font-medium ${currentStep >= index + 1 ? 'text-white' : 'text-white/60'}`}>{stepNames[index]}</span>
+                      </div>
+                      {index < 4 && (
+                        <div className="flex-1 h-1 mx-4 bg-white/20 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: '0%' }} animate={{ width: currentStep > index + 1 ? '100%' : '0%' }} className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full" transition={{ duration: 0.5 }} />
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+              <GoogleMapsErrorBoundary>
+                <AnimatePresence mode="wait" initial={false}>
+                  {currentStep === 1 && <RouteStep key="route-step-1" onNext={handleRouteNext} disabled={isTransitioning} />}
+                  {currentStep === 2 && <VehicleStep key="vehicle-step-2" vehicles={vehicles} services={services} reservationData={reservationData} loadingVehicles={loadingVehicles} loadingServices={loadingServices} onNext={handleVehicleNext} onBack={() => safeSetCurrentStep(1)} disabled={isTransitioning} />}
+                  {currentStep === 3 && <CustomerInfoStep key="customer-step-3" onNext={handleCustomerNext} onBack={() => safeSetCurrentStep(2)} disabled={isTransitioning} />}
+                  {currentStep === 4 && <PaymentStep key="payment-step-4" reservationData={reservationData} onNext={handlePaymentNext} onBack={() => safeSetCurrentStep(3)} disabled={isTransitioning} />}
+                  {currentStep === 5 && <ConfirmationStep key="confirmation-step-5" reservationData={reservationData} qrCode={qrCode} />}
+                </AnimatePresence>
+              </GoogleMapsErrorBoundary>
+              {isTransitioning && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 rounded-3xl">
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+                    <div className="flex items-center space-x-3">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                      <span className="text-white font-medium">Adım geçişi...</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </ErrorBoundary>
   );
 }
