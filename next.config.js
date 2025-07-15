@@ -1,5 +1,3 @@
-// next.config.js
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   trailingSlash: true,
@@ -9,9 +7,8 @@ const nextConfig = {
   experimental: {
     esmExternals: 'loose',
   },
-  // --- DÜZELTİLMİŞ BÖLÜM ---
+  // API anahtarının DOĞRU VE STANDART ADIYLA okunmasını sağlıyoruz.
   env: {
-    // Doğru değişken adı burada kullanıldı
     NEXT_PUBLIC_Maps_API_KEY: process.env.NEXT_PUBLIC_Maps_API_KEY,
   },
 };
