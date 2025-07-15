@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -29,6 +29,7 @@ import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
 import { realTimeReservationService, realTimeDriverService } from '../../../lib/services/realTimeService';
 import { Reservation, Driver } from '../../../lib/types';
+import ErrorBoundary from '../../../components/common/ErrorBoundary';
 
 export default function AdminReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -37,61 +38,95 @@ export default function AdminReservationsPage() {
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  
+  // Add isMounted ref to prevent state updates on unmounted components
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadData();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const loadData = async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       setLoading(true);
       const [reservationsData, driversData] = await Promise.all([
         realTimeReservationService.getAll(),
         realTimeDriverService.getActiveDrivers()
       ]);
-      setReservations(reservationsData);
-      setDrivers(driversData);
+      
+      if (isMountedRef.current) {
+        setReservations(reservationsData);
+        setDrivers(driversData);
+      }
     } catch (error) {
-      toast.error('Veri yüklenirken hata oluştu');
+      if (isMountedRef.current) {
+        toast.error('Veri yüklenirken hata oluştu');
+      }
       console.error('Error loading data:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleAssignDriver = async (driverId: string) => {
-    if (!selectedReservation) return;
+    if (!selectedReservation || !isMountedRef.current) return;
     
     try {
       await realTimeReservationService.assignDriver(selectedReservation.id, driverId);
       await loadData();
-      setShowAssignModal(false);
-      setSelectedReservation(null);
-      toast.success('🎉 Şoför başarıyla atandı!');
+      
+      if (isMountedRef.current) {
+        setShowAssignModal(false);
+        setSelectedReservation(null);
+        toast.success('🎉 Şoför başarıyla atandı!');
+      }
     } catch (error) {
-      toast.error('❌ Şoför atanırken hata oluştu.');
+      if (isMountedRef.current) {
+        toast.error('❌ Şoför atanırken hata oluştu.');
+      }
     }
   };
 
   const handleStatusUpdate = async (reservationId: string, status: Reservation['status']) => {
+    if (!isMountedRef.current) return;
+    
     try {
       await realTimeReservationService.update(reservationId, { status });
       await loadData();
-      toast.success('✅ Durum güncellendi!');
+      
+      if (isMountedRef.current) {
+        toast.success('✅ Durum güncellendi!');
+      }
     } catch (error) {
-      toast.error('❌ Durum güncellenirken hata oluştu.');
+      if (isMountedRef.current) {
+        toast.error('❌ Durum güncellenirken hata oluştu.');
+      }
     }
   };
 
   const handleDeleteReservation = async (reservationId: string) => {
-    if (!confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) return;
+    if (!confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?') || !isMountedRef.current) return;
     
     try {
       await realTimeReservationService.delete(reservationId);
       await loadData();
-      toast.success('🗑️ Rezervasyon silindi!');
+      
+      if (isMountedRef.current) {
+        toast.success('🗑️ Rezervasyon silindi!');
+      }
     } catch (error) {
-      toast.error('❌ Rezervasyon silinirken hata oluştu.');
+      if (isMountedRef.current) {
+        toast.error('❌ Rezervasyon silinirken hata oluştu.');
+      }
     }
   };
 
@@ -268,7 +303,12 @@ export default function AdminReservationsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <ErrorBoundary 
+      onError={(error, errorInfo) => {
+        console.error('Admin Reservations Error:', error, errorInfo);
+      }}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -514,5 +554,6 @@ export default function AdminReservationsPage() {
         </Modal>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

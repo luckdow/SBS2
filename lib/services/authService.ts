@@ -18,10 +18,25 @@ export class AuthService {
 
   static async signInWithGoogle(): Promise<User | null> {
     try {
+      // Enhanced popup handling with better error management
       const result = await signInWithPopup(auth, this.googleProvider);
       return result.user;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google sign-in error:', error);
+      
+      // Handle specific auth errors with user-friendly messages
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Giriş penceresi kapatıldı. Lütfen tekrar deneyin.');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Popup engellendi. Lütfen tarayıcı ayarlarınızı kontrol edin.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        throw new Error('Giriş işlemi iptal edildi.');
+      } else if (error.code === 'auth/operation-not-allowed') {
+        throw new Error('Google girişi etkinleştirilmemiş.');
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.');
+      }
+      
       throw error;
     }
   }
@@ -59,9 +74,27 @@ export class AuthService {
 
   static async signOut(): Promise<void> {
     try {
+      // Enhanced sign out with cleanup
       await firebaseSignOut(auth);
-    } catch (error) {
+      
+      // Clear any cached data or localStorage
+      try {
+        if (typeof window !== 'undefined') {
+          // Clear any Google Maps related data
+          window.localStorage.removeItem('google_maps_session');
+          window.sessionStorage.removeItem('user_session');
+        }
+      } catch (cleanupError) {
+        console.warn('Cleanup during sign out failed (non-critical):', cleanupError);
+      }
+    } catch (error: any) {
       console.error('Sign-out error:', error);
+      
+      // Handle specific sign-out errors
+      if (error.code === 'auth/network-request-failed') {
+        throw new Error('Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.');
+      }
+      
       throw error;
     }
   }

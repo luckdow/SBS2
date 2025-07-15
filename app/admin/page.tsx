@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, 
@@ -39,6 +39,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { realTimeReservationService, realTimeDriverService } from '../../lib/services/realTimeService';
 import { NotificationService } from '../../lib/services/notificationService';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 export default function AdminDashboard() {
   const [reservations, setReservations] = useState<any[]>([]);
@@ -57,6 +58,9 @@ export default function AdminDashboard() {
     avgRating: 4.8,
     activeDrivers: 15
   });
+
+  // Add isMounted ref to prevent state updates on unmounted components
+  const isMountedRef = useRef(true);
 
   // Mock data
   const mockReservations = [
@@ -122,18 +126,30 @@ export default function AdminDashboard() {
   ];
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadData();
     
-    // Real-time reservations listener
+    // Real-time reservations listener with error handling
     const unsubscribe = realTimeReservationService.onReservationsChange((newReservations) => {
-      setReservations(newReservations);
-      console.log('📊 Admin panel received real-time update:', newReservations.length, 'reservations');
+      if (isMountedRef.current) {
+        setReservations(newReservations);
+        console.log('📊 Admin panel received real-time update:', newReservations.length, 'reservations');
+      }
     });
     
-    return () => unsubscribe();
+    return () => {
+      isMountedRef.current = false;
+      try {
+        unsubscribe();
+      } catch (error) {
+        console.warn('Error unsubscribing from reservations (non-critical):', error);
+      }
+    };
   }, []);
 
   const loadData = async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       setLoading(true);
       console.log('📊 Loading admin data...');
@@ -141,19 +157,26 @@ export default function AdminDashboard() {
         realTimeReservationService.getAll(),
         realTimeDriverService.getAll()
       ]);
-      setReservations(reservationsData);
-      setDrivers(driversData);
-      console.log('✅ Admin data loaded:', reservationsData.length, 'reservations,', driversData.length, 'drivers');
+      
+      if (isMountedRef.current) {
+        setReservations(reservationsData);
+        setDrivers(driversData);
+        console.log('✅ Admin data loaded:', reservationsData.length, 'reservations,', driversData.length, 'drivers');
+      }
     } catch (error) {
-      toast.error('Veriler yüklenirken hata oluştu');
+      if (isMountedRef.current) {
+        toast.error('Veriler yüklenirken hata oluştu');
+      }
       console.error('Error loading data:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleAssignDriver = async (driverId: string) => {
-    if (!selectedReservation) return;
+    if (!selectedReservation || !isMountedRef.current) return;
     
     try {
       console.log('👨‍💼 Assigning driver:', driverId, 'to reservation:', selectedReservation.id);
@@ -163,7 +186,7 @@ export default function AdminDashboard() {
       
       // Send notification to driver
       const driver = drivers.find(d => d.id === driverId);
-      if (driver) {
+      if (driver && isMountedRef.current) {
         console.log('📱 Sending notification to driver:', driver.name);
         await NotificationService.sendDriverNotification(driverId, selectedReservation);
         
@@ -174,11 +197,15 @@ export default function AdminDashboard() {
         );
       }
       
-      setShowAssignModal(false);
-      setSelectedReservation(null);
-      toast.success('🎉 Şoför başarıyla atandı ve bildirim gönderildi!');
+      if (isMountedRef.current) {
+        setShowAssignModal(false);
+        setSelectedReservation(null);
+        toast.success('🎉 Şoför başarıyla atandı ve bildirim gönderildi!');
+      }
     } catch (error) {
-      toast.error('❌ Şoför atanırken hata oluştu.');
+      if (isMountedRef.current) {
+        toast.error('❌ Şoför atanırken hata oluştu.');
+      }
       console.error('Driver assignment error:', error);
     }
   };
@@ -217,7 +244,12 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <ErrorBoundary 
+      onError={(error, errorInfo) => {
+        console.error('Admin Dashboard Error:', error, errorInfo);
+      }}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -841,5 +873,6 @@ export default function AdminDashboard() {
         </AnimatePresence>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

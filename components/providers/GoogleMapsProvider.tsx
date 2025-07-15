@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 
 interface GoogleMapsContextType {
@@ -30,15 +30,25 @@ export default function GoogleMapsProvider({ children }: { children: React.React
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [google, setGoogle] = useState<typeof window.google | null>(null);
+  
+  // Add isMounted ref to prevent state updates on unmounted components
+  const isMountedRef = useRef(true);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     const loadGoogleMaps = async () => {
       try {
+        // Only update state if component is still mounted
+        if (!isMountedRef.current) return;
+        
         setIsLoading(true);
         setError(null);
         
         // Check if Google Maps is already loaded
         if (typeof window !== 'undefined' && window.google?.maps) {
+          if (!isMountedRef.current) return;
           setGoogle(window.google);
           setIsLoaded(true);
           setIsLoading(false);
@@ -47,27 +57,65 @@ export default function GoogleMapsProvider({ children }: { children: React.React
         
         // Load Google Maps using our service
         const googleMaps = await GoogleMapsService.loadGoogleMaps();
+        
+        // Check if component is still mounted before updating state
+        if (!isMountedRef.current) return;
+        
         setGoogle(googleMaps);
         setIsLoaded(true);
         
         console.log('✅ Google Maps loaded globally via GoogleMapsProvider');
       } catch (err) {
+        // Only update state if component is still mounted
+        if (!isMountedRef.current) return;
+        
         const errorMessage = err instanceof Error ? err.message : 'Google Maps yüklenemedi';
         setError(errorMessage);
         console.warn('⚠️ Google Maps global loading failed:', errorMessage);
       } finally {
-        setIsLoading(false);
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadGoogleMaps();
 
-    // Cleanup function to handle provider unmount
+    // Enhanced cleanup function with error handling
+    const cleanup = () => {
+      console.log('🧹 GoogleMapsProvider: Starting cleanup...');
+      try {
+        // Force cleanup all Google Maps elements when provider unmounts
+        GoogleMapsService.safeDOMOperation(() => {
+          GoogleMapsService.forceCleanupAllGoogleMapsElements();
+        }, 'GoogleMapsProvider cleanup on unmount', undefined);
+      } catch (cleanupError) {
+        console.warn('GoogleMapsProvider cleanup error (non-critical):', cleanupError);
+      }
+    };
+    
+    cleanupRef.current = cleanup;
+    
     return () => {
-      // Force cleanup all Google Maps elements when provider unmounts
-      GoogleMapsService.safeDOMOperation(() => {
-        GoogleMapsService.forceCleanupAllGoogleMapsElements();
-      }, 'GoogleMapsProvider cleanup on unmount', undefined);
+      console.log('🧹 GoogleMapsProvider: Component unmounting...');
+      isMountedRef.current = false;
+      
+      // Execute cleanup with error handling
+      try {
+        if (cleanupRef.current) {
+          cleanupRef.current();
+        }
+      } catch (error) {
+        console.warn('GoogleMapsProvider unmount cleanup error (non-critical):', error);
+      }
+    };
+  }, []);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
     };
   }, []);
 

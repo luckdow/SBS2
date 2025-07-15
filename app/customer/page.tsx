@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
@@ -35,14 +35,19 @@ import { useRouter } from 'next/navigation';
 import { AuthService } from '../../lib/services/authService';
 import { User as AppUser } from '../../lib/types';
 import toast from 'react-hot-toast';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 export default function CustomerDashboard() {
   const [reservations, setReservations] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  
+  // Add isMounted ref to prevent state updates on unmounted components
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     const checkAuth = async () => {
       const user = AuthService.getCurrentUser();
       if (!user) {
@@ -52,7 +57,7 @@ export default function CustomerDashboard() {
 
       try {
         const profile = await AuthService.getUserProfile(user);
-        if (profile) {
+        if (profile && isMountedRef.current) {
           setCurrentUser(profile);
           
           // Check if user has the right role for this page
@@ -64,23 +69,37 @@ export default function CustomerDashboard() {
         }
       } catch (error) {
         console.error('Error loading user profile:', error);
-        toast.error('Profil bilgileri yüklenirken hata oluştu!');
+        if (isMountedRef.current) {
+          toast.error('Profil bilgileri yüklenirken hata oluştu!');
+        }
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     checkAuth();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [router]);
 
   const handleSignOut = async () => {
+    if (!isMountedRef.current) return;
+    
     try {
       await AuthService.signOut();
-      toast.success('Çıkış yapıldı!');
-      router.push('/');
+      if (isMountedRef.current) {
+        toast.success('Çıkış yapıldı!');
+        router.push('/');
+      }
     } catch (error) {
       console.error('Sign out error:', error);
-      toast.error('Çıkış yapılırken hata oluştu!');
+      if (isMountedRef.current) {
+        toast.error('Çıkış yapılırken hata oluştu!');
+      }
     }
   };
 
@@ -211,7 +230,12 @@ export default function CustomerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <ErrorBoundary 
+      onError={(error, errorInfo) => {
+        console.error('Customer Dashboard Error:', error, errorInfo);
+      }}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -588,5 +612,6 @@ export default function CustomerDashboard() {
         </motion.div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
