@@ -25,18 +25,17 @@ export default function GoogleMapsAutocomplete({
 
   useEffect(() => {
     onStatusChange('loading');
+
     GoogleMapsService.loadGoogleMaps()
       .then(() => {
         if (!inputRef.current) return;
         
-        // Klasik ve stabil Autocomplete nesnesini oluştur
         autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
           types: ['establishment', 'geocode'],
           componentRestrictions: { country: 'TR' },
           fields: ['name', 'formatted_address', 'geometry'],
         });
 
-        // Kullanıcı listeden bir yer seçtiğinde...
         autocompleteRef.current.addListener('place_changed', () => {
           const place = autocompleteRef.current?.getPlace();
           if (place?.geometry) {
@@ -49,7 +48,7 @@ export default function GoogleMapsAutocomplete({
       .catch(error => {
         onStatusChange('error', error.message);
       });
-  }, []); // Not: Bağımlılık dizisi boş olmalı ki sadece bir kez çalışsın.
+  }, []);
 
   return (
     <input
