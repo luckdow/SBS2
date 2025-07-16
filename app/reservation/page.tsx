@@ -9,22 +9,114 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+
+// Service imports
 import { EmailService } from '../../lib/services/emailService';
 import { AuthService } from '../../lib/services/authService';
 import { realTimeReservationService } from '../../lib/services/realTimeService';
 import { vehicleService } from '../../lib/services/vehicleService';
 import { serviceService } from '../../lib/services/serviceService';
+
+// UI Component imports
 import HybridAddressInput from '../../components/ui/HybridAddressInput';
 import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 import ErrorBoundary, { GoogleMapsErrorBoundary } from '../../components/common/ErrorBoundary';
 
+// Type definitions for the new reservation system
+
+// Type definitions for the new reservation system
+interface RouteInfo {
+  distance: number;
+  duration: number;
+  distanceText: string;
+  durationText: string;
+}
+
+interface Vehicle {
+  id: string;
+  name: string;
+  image: string;
+  capacity: number;
+  baggage: number;
+  pricePerKm: number;
+  features: string[];
+  rating: number;
+  gradient: string;
+  isActive: boolean;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  icon: any;
+  gradient: string;
+  isActive: boolean;
+}
+
+interface ReservationData {
+  // Step 1: Route Selection
+  direction: 'airport-to-hotel' | 'hotel-to-airport';
+  hotelLocation: string;
+  date: string;
+  time: string;
+  passengers: number;
+  baggage: number;
+  from: string;
+  to: string;
+  distance: number;
+  estimatedDuration: string;
+  hotelPlace?: google.maps.places.Place;
+  
+  // Step 2: Vehicle & Price Selection
+  vehicle?: Vehicle;
+  selectedServices: string[];
+  basePrice: number;
+  servicesPrice: number;
+  totalPrice: number;
+  
+  // Step 3: Personal Information
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  flightNumber?: string;
+  specialRequests?: string;
+  
+  // Step 4: Payment
+  paymentMethod: 'cash' | 'bank-transfer' | 'credit-card';
+  
+  // Internal fields
+  id?: string;
+  customerId?: string;
+  status?: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  createdAt?: string;
+  customerCredentials?: {
+    email: string;
+    tempPassword: string;
+  };
+}
+
+interface PaymentSettings {
+  creditCardActive: boolean;
+  bankTransferActive: boolean;
+  cashActive: boolean;
+  bankDetails?: {
+    bankName: string;
+    accountHolder: string;
+    iban: string;
+    accountNumber: string;
+    swiftCode?: string;
+  };
+}
 // #####################################################################
-// ### 1. ADIM: ROTA SEÇİMİ BİLEŞENİ                              ###
+// ### STEP 1: ROUTE SELECTION COMPONENT                           ###
 // #####################################################################
 function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; disabled?: boolean }) {
   const [formData, setFormData] = useState({
-    direction: 'airport-to-hotel',
+    direction: 'airport-to-hotel' as 'airport-to-hotel' | 'hotel-to-airport',
     hotelLocation: '',
     date: '',
     time: '',
@@ -33,7 +125,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
   });
 
   const [hotelPlace, setHotelPlace] = useState<google.maps.places.Place | undefined>();
-  const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; distanceText: string; durationText: string; } | null>(null);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
 
   const getFromLocation = () => formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
   const getToLocation = () => formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı';
@@ -41,7 +133,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
   const handleHotelLocationChange = (value: string, place?: google.maps.places.Place) => {
     setFormData(prev => ({ ...prev, hotelLocation: value }));
     if (place && place.location) {
-      setHotelPlace(place as any); // Type assertion for compatibility
+      setHotelPlace(place);
       setRouteInfo(null);
     } else {
       setHotelPlace(undefined);
@@ -49,7 +141,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
     }
   };
 
-  const handleRouteCalculated = (result: { distance: number; duration: number; distanceText: string; durationText: string; }) => {
+  const handleRouteCalculated = (result: RouteInfo) => {
     setRouteInfo(result);
   };
 
@@ -112,7 +204,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           <label className="block text-lg font-semibold text-white">Transfer Yönü</label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <label className="relative group cursor-pointer">
-              <input type="radio" name="direction" value="airport-to-hotel" checked={formData.direction === 'airport-to-hotel'} onChange={(e) => setFormData({ ...formData, direction: e.target.value })} className="sr-only" />
+              <input type="radio" name="direction" value="airport-to-hotel" checked={formData.direction === 'airport-to-hotel'} onChange={(e) => setFormData({ ...formData, direction: e.target.value as 'airport-to-hotel' | 'hotel-to-airport' })} className="sr-only" />
               <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${formData.direction === 'airport-to-hotel' ? 'border-blue-500 bg-blue-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
                 <div className="flex items-center space-x-4">
                   <div className={`p-3 rounded-xl ${formData.direction === 'airport-to-hotel' ? 'bg-blue-500' : 'bg-white/20'}`}><Plane className="h-6 w-6 text-white" /></div>
@@ -124,7 +216,7 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
               </div>
             </label>
             <label className="relative group cursor-pointer">
-              <input type="radio" name="direction" value="hotel-to-airport" checked={formData.direction === 'hotel-to-airport'} onChange={(e) => setFormData({ ...formData, direction: e.target.value })} className="sr-only" />
+              <input type="radio" name="direction" value="hotel-to-airport" checked={formData.direction === 'hotel-to-airport'} onChange={(e) => setFormData({ ...formData, direction: e.target.value as 'airport-to-hotel' | 'hotel-to-airport' })} className="sr-only" />
               <div className={`p-6 border-2 rounded-2xl transition-all duration-300 ${formData.direction === 'hotel-to-airport' ? 'border-purple-500 bg-purple-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
                 <div className="flex items-center space-x-4">
                   <div className={`p-3 rounded-xl ${formData.direction === 'hotel-to-airport' ? 'bg-purple-500' : 'bg-white/20'}`}><Plane className="h-6 w-6 text-white transform rotate-180" /></div>
@@ -223,10 +315,154 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
             <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
           </button>
+}
+
+// #####################################################################
+// ### STEP 2: VEHICLE & PRICE SELECTION COMPONENT                 ###
+// #####################################################################
+function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack, disabled = false }: any) {
+    const [selectedVehicle, setSelectedVehicle] = useState('');
+    const [selectedServices, setSelectedServices] = useState<string[]>([]);
+    const [distance, setDistance] = useState(reservationData?.distance || 0);
+  
+    const handleRouteCalculated = (result: { distance: number }) => {
+      const distanceInKm = Math.round(result.distance / 1000);
+      if (distanceInKm > 0) {
+        setDistance(distanceInKm);
+      }
+    };
+  
+    const getFilteredVehicles = () => {
+      const passengers = reservationData?.passengers || 1;
+      const baggage = reservationData?.baggage || 1;
+      return vehicles.filter((v: any) => v.capacity >= passengers && v.baggage >= baggage);
+    };
+  
+    const filteredVehicles = getFilteredVehicles();
+  
+    const getPrice = (vehicle: any) => {
+      if (!vehicle || !distance) return 0;
+      return vehicle.pricePerKm * distance;
+    };
+  
+    const getTotalPrice = () => {
+      const vehicle = vehicles.find((v: any) => v.id === selectedVehicle);
+      if (!vehicle) return 0;
+      
+      const basePrice = getPrice(vehicle);
+      const servicesPrice = selectedServices.reduce((total, serviceId) => {
+        const service = services.find((s: any) => s.id === serviceId);
+        return total + (service ? service.price : 0);
+      }, 0);
+      
+      return basePrice + servicesPrice;
+    };
+  
+    const handleServiceToggle = (serviceId: string) => {
+      setSelectedServices(prev => 
+        prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]
+      );
+    };
+  
+    const handleNext = () => {
+      const vehicle = vehicles.find((v: any) => v.id === selectedVehicle);
+      if (!vehicle) {
+        toast.error("Lütfen bir araç seçin.");
+        return;
+      }
+      onNext({ 
+          vehicle, 
+          selectedServices, 
+          basePrice: getPrice(vehicle),
+          servicesPrice: selectedServices.reduce((total, serviceId) => {
+              const service = services.find((s: any) => s.id === serviceId);
+              return total + (service ? service.price : 0);
+          }, 0),
+          totalPrice: getTotalPrice(), 
+          distance 
+      });
+    };
+  
+    return (
+      <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="space-y-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white mb-3">Araç & Fiyat Seçimi</h2>
+          <p className="text-white/70 text-lg">
+            Size uygun lüks aracı seçin (Mesafe: {distance > 0 ? `${distance} km` : 'Hesaplanıyor...'}{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''})
+          </p>
         </div>
-      </form>
-    </motion.div>
-  );
+        
+        <GoogleMapsErrorBoundary>
+          <HybridRouteDisplay 
+            origin={reservationData.from} 
+            destination={reservationData.to} 
+            originPlace={reservationData.direction === 'hotel-to-airport' ? reservationData.hotelPlace : undefined}
+            destinationPlace={reservationData.direction === 'airport-to-hotel' ? reservationData.hotelPlace : undefined}
+            onRouteCalculated={handleRouteCalculated} 
+          />
+        </GoogleMapsErrorBoundary>
+  
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-white flex items-center space-x-2"><Car className="h-6 w-6" /><span>Premium Araç Seçimi</span></h3>
+            <div className="bg-blue-500/20 backdrop-blur-md border border-blue-500/50 rounded-xl px-4 py-2"><span className="text-blue-200 text-sm">{reservationData?.passengers} yolcu, {reservationData?.baggage} bagaj için uygun araçlar</span></div>
+          </div>
+          {loadingVehicles ? (<div className="flex justify-center items-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div><span className="ml-3 text-white">Araçlar yükleniyor...</span></div>) : filteredVehicles.length === 0 ? (<div className="text-center py-12"><Car className="h-12 w-12 text-white/60 mx-auto mb-4" /><p className="text-white/70 mb-2">{reservationData?.passengers} yolcu ve {reservationData?.baggage} bagaj için uygun araç bulunmamaktadır.</p><p className="text-white/60 text-sm">Farklı yolcu/bagaj sayısı için önceki adıma dönerek tekrar deneyin.</p></div>) : (<>
+            {vehicles.length > filteredVehicles.length && (<div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-4 mb-4"><div className="flex items-center space-x-2"><AlertCircle className="h-5 w-5 text-yellow-400" /><span className="text-yellow-200 text-sm">{vehicles.length - filteredVehicles.length} araç kapasitesi nedeniyle filtrelendi. Toplam {filteredVehicles.length} uygun araç gösteriliyor.</span></div></div>)}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {filteredVehicles.map((vehicle: any) => (
+                <motion.div key={`vehicle-${vehicle.id}`} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setSelectedVehicle(vehicle.id)} className={`cursor-pointer transition-all duration-300 border-2 rounded-2xl p-6 backdrop-blur-md ${selectedVehicle === vehicle.id ? 'border-blue-500 bg-blue-500/20 shadow-2xl' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
+                  <div className="relative mb-4 overflow-hidden rounded-xl"><img src={vehicle.image} alt={vehicle.name} className="w-full h-40 object-cover transition-transform duration-300 hover:scale-110" /><div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md rounded-full px-3 py-1"><div className="flex items-center space-x-1"><Star className="h-4 w-4 text-yellow-400 fill-current" /><span className="text-white text-sm font-medium">{vehicle.rating}</span></div></div></div>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-bold text-white text-lg">{vehicle.name}</h4>
+                      <div className="flex items-center justify-between text-sm text-white/70 mt-2"><div className="flex items-center space-x-1"><Users className="h-4 w-4" /><span>{vehicle.capacity} kişi</span></div><div className="flex items-center space-x-1"><Luggage className="h-4 w-4" /><span>{vehicle.baggage} bavul</span></div></div>
+                    </div>
+                    <div className="space-y-2">{vehicle.features.map((feature: string, index: number) => (<div key={index} className="flex items-center space-x-2 text-sm text-white/80"><div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div><span>{feature}</span></div>))}</div>
+                    <div className="text-center pt-4 border-t border-white/20"><div className={`bg-gradient-to-r ${vehicle.gradient} text-white px-4 py-2 rounded-xl`}><span className="text-lg font-bold">Premium Paket</span><p className="text-xs opacity-90">Konfor & Güvenlik</p></div></div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </>)}
+        </div>
+        
+        {selectedVehicle && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6">
+            <h3 className="text-xl font-semibold text-white flex items-center space-x-2"><Sparkles className="h-6 w-6" /><span>Ek Premium Hizmetler</span></h3>
+            {loadingServices ? (<div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div><span className="ml-3 text-white">Hizmetler yükleniyor...</span></div>) : services.length === 0 ? (<div className="text-center py-8"><Sparkles className="h-8 w-8 text-white/60 mx-auto mb-3" /><p className="text-white/70">Şu anda ek hizmet bulunmamaktadır.</p></div>) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {services.map((service: any) => (
+                  <motion.div key={`service-${service.id}`} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => handleServiceToggle(service.id)} className={`cursor-pointer transition-all duration-300 border-2 rounded-xl p-4 backdrop-blur-md ${selectedServices.includes(service.id) ? 'border-green-500 bg-green-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3"><div className={`p-2 rounded-lg bg-gradient-to-r ${service.gradient}`}><service.icon className="h-5 w-5 text-white" /></div><div className="flex-1"><h4 className="font-semibold text-white">{service.name}</h4><p className="text-sm text-white/70">{service.description}</p></div></div>
+                      <div className="text-right"><span className="font-bold text-green-400 text-lg">₺{service.price}</span>{selectedServices.includes(service.id) && (<CheckCircle className="h-5 w-5 text-green-400 ml-2 inline" />)}</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+        {selectedVehicle && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-r from-blue-500/20 to-purple-600/20 backdrop-blur-md border-2 border-blue-500/50 rounded-2xl p-6">
+            <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2"><CreditCard className="h-6 w-6" /><span>Fiyat Özeti</span></h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-white"><span>Araç kirası ({distance} km)</span><span className="font-semibold">₺{getPrice(vehicles.find((v: any) => v.id === selectedVehicle))}</span></div>
+              {selectedServices.map(serviceId => { const service = services.find((s: any) => s.id === serviceId); return service ? (<div key={serviceId} className="flex justify-between text-white/80"><span>{service.name}</span><span className="font-semibold">₺{service.price}</span></div>) : null; })}
+              <div className="border-t border-white/30 pt-3 flex justify-between font-bold text-xl"><span className="text-white">Toplam</span><span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">₺{getTotalPrice()}</span></div>
+            </div>
+          </motion.div>
+        )}
+        <div className="flex justify-between pt-4">
+          <button onClick={onBack} disabled={disabled} className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" /><span>Geri Dön</span></button>
+          <button onClick={handleNext} disabled={!selectedVehicle || disabled} className="group relative px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2">
+            <span>Devam Et</span><ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
+          </button>
+        </div>
+      </motion.div>
+    );
 }
 
 // #####################################################################
