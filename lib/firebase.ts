@@ -1,51 +1,112 @@
-// Firebase configuration with proper setup
+// Firebase configuration with enhanced setup and validation
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
+// Firebase configuration object
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyB6903uKvs3vjCkfreIvzensUFa25wVB9c",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "sbs-travel-96d0b.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sbs-travel-96d0b",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "sbs-travel-96d0b.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "689333443277",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:689333443277:web:d26c455760eb28a41e6784",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-G4FRHCJEDP"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || ""
+};
+
+// Validate Firebase configuration
+export const validateFirebaseConfig = () => {
+  const requiredFields = [
+    'apiKey', 'authDomain', 'projectId', 'storageBucket', 
+    'messagingSenderId', 'appId'
+  ];
+  
+  const missingFields = requiredFields.filter(field => 
+    !firebaseConfig[field as keyof typeof firebaseConfig] || 
+    firebaseConfig[field as keyof typeof firebaseConfig] === ""
+  );
+  
+  if (missingFields.length > 0) {
+    console.error('Missing Firebase configuration fields:', missingFields);
+    return false;
+  }
+  
+  return true;
+};
+
+// Check if Firebase is properly configured
+export const isFirebaseConfigured = () => {
+  return validateFirebaseConfig() && 
+         firebaseConfig.apiKey.startsWith("AIza") &&
+         firebaseConfig.projectId !== "" &&
+         firebaseConfig.authDomain !== "";
 };
 
 // Initialize Firebase only if not already initialized
 let app;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
+try {
+  if (getApps().length === 0) {
+    if (!validateFirebaseConfig()) {
+      throw new Error('Firebase configuration is incomplete. Please check your environment variables.');
+    }
+    app = initializeApp(firebaseConfig);
+    console.log('Firebase initialized successfully');
+  } else {
+    app = getApps()[0];
+  }
+} catch (error) {
+  console.error('Firebase initialization failed:', error);
+  throw error;
 }
 
-// Initialize Firebase services
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+// Initialize Firebase services with error handling
+export let db: any;
+export let auth: any;
+export let storage: any;
 
-// Check if Firebase is properly configured
-export const isFirebaseConfigured = () => {
-  return firebaseConfig.apiKey !== "AIzaSyDemo-Key-Replace-With-Real" && 
-         firebaseConfig.projectId !== "sbs-travel-demo" &&
-         firebaseConfig.apiKey.startsWith("AIza");
-};
+try {
+  db = getFirestore(app);
+  auth = getAuth(app);
+  storage = getStorage(app);
+} catch (error) {
+  console.error('Firebase services initialization failed:', error);
+  throw error;
+}
 
-// For development - you can enable emulators if needed
-if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-  try {
-    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
-      // Uncomment these lines if you want to use Firebase emulators
-      // connectFirestoreEmulator(db, 'localhost', 8080);
-      // connectAuthEmulator(auth, 'http://localhost:9099');
-      // connectStorageEmulator(storage, 'localhost', 9199);
+// Development emulator configuration
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const useEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+  
+  if (useEmulators && window.location.hostname === 'localhost') {
+    try {
+      // Connect to Firebase emulators if enabled
+      console.log('Connecting to Firebase emulators...');
+      connectFirestoreEmulator(db, 'localhost', 8080);
+      connectAuthEmulator(auth, 'http://localhost:9099');
+      connectStorageEmulator(storage, 'localhost', 9199);
+      console.log('Firebase emulators connected successfully');
+    } catch (error) {
+      console.warn('Emulator connection failed (may already be connected):', error);
     }
-  } catch (error) {
-    console.log('Emulator connection failed:', error);
   }
 }
+
+// Firebase connection test
+export const testFirebaseConnection = async () => {
+  try {
+    if (!isFirebaseConfigured()) {
+      throw new Error('Firebase is not properly configured');
+    }
+    
+    // Test Firestore connection
+    await db._delegate._databaseId;
+    console.log('Firebase connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Firebase connection test failed:', error);
+    return false;
+  }
+};
 
 export default app;
