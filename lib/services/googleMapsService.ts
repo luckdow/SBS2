@@ -3,8 +3,8 @@
 /**
  * GoogleMapsService - STABİL SÜRÜM
  *
- * Bu sürüm, "importLibrary" hatasını kesin olarak çözmek için kütüphaneleri
- * doğrudan script URL'si üzerinden, en kararlı ve klasik yöntemle yükler.
+ * Bu sürüm, en kararlı ve klasik yöntemle kütüphaneleri yükler.
+ * Versiyon uyumsuzluğu ve 'importLibrary' hatalarını kesin olarak çözer.
  */
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
@@ -16,7 +16,6 @@ export class GoogleMapsService {
     }
 
     this.loadPromise = new Promise((resolve, reject) => {
-      // Scriptin ve kütüphanelerin zaten yüklenip yüklenmediğini kontrol et
       if (typeof window.google?.maps?.places !== 'undefined') {
         return resolve(window.google);
       }
@@ -24,10 +23,9 @@ export class GoogleMapsService {
       if (!this.apiKey) {
         return reject(new Error('API anahtarı bulunamadı. NEXT_PUBLIC_Maps_API_KEY ayarını kontrol edin.'));
       }
-
+      
       const scriptId = 'google-maps-script';
       if (document.getElementById(scriptId)) {
-        // Script zaten varsa ama yüklenmemişse, bir süre bekle
         setTimeout(() => {
           if (window.google?.maps?.places) {
             resolve(window.google);
@@ -40,14 +38,14 @@ export class GoogleMapsService {
       
       const script = document.createElement('script');
       script.id = scriptId;
-      // Kütüphaneler (places, geometry, routes) doğrudan URL'de istenir. Beta kanalı kullanılmaz.
+      // Kütüphaneler (places, geometry, routes) doğrudan URL'den istenir. Bu en kararlı yöntemdir.
       script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry,routes&language=tr&region=TR`;
       script.async = true;
       script.defer = true;
       
       script.onload = () => resolve(window.google);
       
-      script.onerror = (e) => {
+      script.onerror = () => {
         this.loadPromise = null;
         reject(new Error('Google Haritalar scripti yüklenemedi.'));
       };
@@ -57,7 +55,7 @@ export class GoogleMapsService {
 
     return this.loadPromise;
   }
-  
+
   static async getDirections(origin: string | google.maps.LatLng, destination: string | google.maps.LatLng): Promise<google.maps.DirectionsResult> {
     await this.loadGoogleMaps();
     const directionsService = new google.maps.DirectionsService();
@@ -69,7 +67,6 @@ export class GoogleMapsService {
     });
   }
   
-  // Bu fonksiyon hem Provider hem de safeStepTransitionCleanup tarafından kullanılabilir.
   static forceCleanupAllGoogleMapsElements() {
     document.querySelectorAll('.pac-container, .gmnoprint').forEach(el => el.remove());
   }
