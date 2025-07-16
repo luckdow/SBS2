@@ -1,14 +1,15 @@
 // Konum: lib/services/googleMapsService.ts
 
 /**
- * GoogleMapsService - STABİL SÜRÜM
+ * GoogleMapsService - STABİL ve TAM SÜRÜM
  *
- * Bu sürüm, en kararlı ve klasik yöntemle kütüphaneleri yükler.
- * Versiyon uyumsuzluğu ve 'importLibrary' hatalarını kesin olarak çözer.
+ * Bu sürüm, "importLibrary" veya "removeChild" gibi hataları kesin olarak çözmek için
+ * kütüphaneleri doğrudan script URL'si üzerinden, en kararlı ve klasik yöntemle yükler.
  */
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
-  private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
+  // NOT: Lütfen Vercel'deki ortam değişkeninizin adının bu olduğundan emin olun.
+  private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY; 
 
   static loadGoogleMaps(): Promise<typeof window.google> {
     if (this.loadPromise) {
@@ -16,16 +17,21 @@ export class GoogleMapsService {
     }
 
     this.loadPromise = new Promise((resolve, reject) => {
+      // Script zaten yüklenmiş ve kütüphaneler mevcut mu diye kontrol et
       if (typeof window.google?.maps?.places !== 'undefined') {
+        console.log('✅ Google Maps ve kütüphaneleri zaten yüklü.');
         return resolve(window.google);
       }
 
       if (!this.apiKey) {
-        return reject(new Error('API anahtarı bulunamadı. NEXT_PUBLIC_Maps_API_KEY ayarını kontrol edin.'));
+        const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini .env.local ve Vercel ayarlarınıza ekleyin.';
+        console.error(errorMsg);
+        return reject(new Error(errorMsg));
       }
       
       const scriptId = 'google-maps-script';
       if (document.getElementById(scriptId)) {
+        // Script zaten varsa ama yüklenmemişse, bir süre bekle
         setTimeout(() => {
           if (window.google?.maps?.places) {
             resolve(window.google);
@@ -38,14 +44,17 @@ export class GoogleMapsService {
       
       const script = document.createElement('script');
       script.id = scriptId;
-      // Kütüphaneler (places, geometry, routes) doğrudan URL'den istenir. Bu en kararlı yöntemdir.
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry,routes&language=tr&region=TR`;
+      // Kütüphaneler (places, geometry, routes) doğrudan URL'de istenir. Beta kanalı kullanılmaz.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry,routes&language=tr&region=TR&loading=async`;
       script.async = true;
       script.defer = true;
       
-      script.onload = () => resolve(window.google);
+      script.onload = () => {
+        console.log('✅ Google Maps ve kütüphaneleri başarıyla yüklendi.');
+        resolve(window.google);
+      };
       
-      script.onerror = () => {
+      script.onerror = (e) => {
         this.loadPromise = null;
         reject(new Error('Google Haritalar scripti yüklenemedi.'));
       };
@@ -55,7 +64,7 @@ export class GoogleMapsService {
 
     return this.loadPromise;
   }
-
+  
   static async getDirections(origin: string | google.maps.LatLng, destination: string | google.maps.LatLng): Promise<google.maps.DirectionsResult> {
     await this.loadGoogleMaps();
     const directionsService = new google.maps.DirectionsService();
@@ -67,10 +76,12 @@ export class GoogleMapsService {
     });
   }
   
+  // Hem Provider hem de rezervasyon sayfası tarafından kullanılan ana temizlik fonksiyonu.
   static forceCleanupAllGoogleMapsElements() {
     document.querySelectorAll('.pac-container, .gmnoprint').forEach(el => el.remove());
   }
 
+  // Rezervasyon adımları arası geçiş için kullanılan daha güvenli temizlik metodu.
   static async safeStepTransitionCleanup(delay = 100): Promise<void> {
     this.forceCleanupAllGoogleMapsElements();
     return new Promise(resolve => setTimeout(resolve, delay));
