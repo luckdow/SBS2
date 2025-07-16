@@ -22,6 +22,8 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
+import { ValidatedInput, ValidatedSelect, ValidatedCheckboxGroup } from '../../../components/ui/ValidationFeedback';
+import { useVehicleFormValidation } from '../../../lib/hooks/useVehicleFormValidation';
 import { realTimeVehicleService } from '../../../lib/services/realTimeService';
 import { Vehicle } from '../../../lib/types';
 
@@ -33,28 +35,41 @@ export default function AdminVehiclesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'sedan' as Vehicle['type'],
-    capacity: 4,
-    baggage: 2,
-    pricePerKm: 8,
-    image: '',
-    features: [] as string[],
-    rating: 5.0,
-    isActive: true
+  // Use the new validation hook
+  const {
+    formData,
+    updateField,
+    resetForm: resetFormValidation,
+    getFieldValidation,
+    shouldShowValidation,
+    handleFieldBlur,
+    validateForm,
+    isFormValid,
+    formErrors,
+    formWarnings
+  } = useVehicleFormValidation({
+    validateOnChange: true,
+    validateOnBlur: true
   });
 
   const vehicleTypes = [
-    { value: 'sedan', label: 'Sedan', icon: Car },
-    { value: 'suv', label: 'SUV', icon: Car },
-    { value: 'van', label: 'Van', icon: Car },
-    { value: 'luxury', label: 'Luxury', icon: Award }
+    { value: 'sedan', label: 'Sedan' },
+    { value: 'suv', label: 'SUV' },
+    { value: 'van', label: 'Van' },
+    { value: 'luxury', label: 'Luxury' }
   ];
 
   const commonFeatures = [
-    'Klima', 'Wi-Fi', 'USB Şarj', 'Bluetooth', 'Deri Koltuk', 
-    'Temiz Araç', 'Sigara İçilmez', 'Mini Bar', 'TV', 'Masaj'
+    { value: 'Klima', label: 'Klima' },
+    { value: 'Wi-Fi', label: 'Wi-Fi' },
+    { value: 'USB Şarj', label: 'USB Şarj' },
+    { value: 'Bluetooth', label: 'Bluetooth' },
+    { value: 'Deri Koltuk', label: 'Deri Koltuk' },
+    { value: 'Temiz Araç', label: 'Temiz Araç' },
+    { value: 'Sigara İçilmez', label: 'Sigara İçilmez' },
+    { value: 'Mini Bar', label: 'Mini Bar' },
+    { value: 'TV', label: 'TV' },
+    { value: 'Masaj', label: 'Masaj' }
   ];
 
   useEffect(() => {
@@ -80,11 +95,19 @@ export default function AdminVehiclesPage() {
 
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form before submission
+    const validation = validateForm();
+    if (!validation.isValid) {
+      toast.error('Lütfen form hatalarını düzeltin');
+      return;
+    }
+
     try {
       await realTimeVehicleService.create(formData);
       await loadVehicles();
       setShowAddModal(false);
-      resetForm();
+      resetFormData();
       toast.success('✅ Araç başarıyla eklendi!');
     } catch (error) {
       toast.error('❌ Araç eklenirken hata oluştu.');
@@ -95,11 +118,18 @@ export default function AdminVehiclesPage() {
     e.preventDefault();
     if (!selectedVehicle) return;
     
+    // Validate form before submission
+    const validation = validateForm();
+    if (!validation.isValid) {
+      toast.error('Lütfen form hatalarını düzeltin');
+      return;
+    }
+    
     try {
       await realTimeVehicleService.update(selectedVehicle.id, formData);
       await loadVehicles();
       setShowEditModal(false);
-      resetForm();
+      resetFormData();
       toast.success('✅ Araç bilgileri güncellendi!');
     } catch (error) {
       toast.error('❌ Araç güncellenirken hata oluştu.');
@@ -128,8 +158,8 @@ export default function AdminVehiclesPage() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
+  const resetFormData = () => {
+    resetFormValidation({
       name: '',
       type: 'sedan',
       capacity: 4,
@@ -145,7 +175,7 @@ export default function AdminVehiclesPage() {
 
   const openEditModal = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
-    setFormData({
+    resetFormValidation({
       name: vehicle.name,
       type: vehicle.type,
       capacity: vehicle.capacity,
@@ -157,15 +187,6 @@ export default function AdminVehiclesPage() {
       isActive: vehicle.isActive
     });
     setShowEditModal(true);
-  };
-
-  const handleFeatureToggle = (feature: string) => {
-    setFormData(prev => ({
-      ...prev,
-      features: prev.features.includes(feature)
-        ? prev.features.filter(f => f !== feature)
-        : [...prev.features, feature]
-    }));
   };
 
   const columns = [
@@ -365,125 +386,167 @@ export default function AdminVehiclesPage() {
           onClose={() => {
             setShowAddModal(false);
             setShowEditModal(false);
-            resetForm();
+            resetFormData();
           }}
           title={showAddModal ? "Yeni Araç Ekle" : `Araç Düzenle - ${selectedVehicle?.name}`}
           size="lg"
         >
           <form onSubmit={showAddModal ? handleAddVehicle : handleEditVehicle} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Araç Adı</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Araç Tipi</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value as Vehicle['type']})}
-                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                >
-                  {vehicleTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Kapasite</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={formData.capacity}
-                  onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value)})}
-                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Bagaj Kapasitesi</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="20"
-                  value={formData.baggage}
-                  onChange={(e) => setFormData({...formData, baggage: parseInt(e.target.value)})}
-                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Fiyat (₺/km)</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="0.1"
-                  value={formData.pricePerKm}
-                  onChange={(e) => setFormData({...formData, pricePerKm: parseFloat(e.target.value)})}
-                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Puan</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="0.1"
-                  value={formData.rating}
-                  onChange={(e) => setFormData({...formData, rating: parseFloat(e.target.value)})}
-                  className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-            </div>
+              {/* Vehicle Name */}
+              <ValidatedInput
+                label="Araç Adı"
+                type="text"
+                value={formData.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                onBlur={() => handleFieldBlur('name')}
+                isValid={shouldShowValidation('name') ? getFieldValidation('name').isValid : undefined}
+                error={shouldShowValidation('name') ? getFieldValidation('name').error : undefined}
+                warning={shouldShowValidation('name') ? getFieldValidation('name').warning : undefined}
+                showSuccess={shouldShowValidation('name') && getFieldValidation('name').isValid}
+                required
+              />
 
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">Resim URL</label>
-              <input
-                type="url"
-                value={formData.image}
-                onChange={(e) => setFormData({...formData, image: e.target.value})}
-                className="w-full px-4 py-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                placeholder="https://example.com/image.jpg"
+              {/* Vehicle Type */}
+              <ValidatedSelect
+                label="Araç Tipi"
+                value={formData.type}
+                onChange={(e) => updateField('type', e.target.value)}
+                onBlur={() => handleFieldBlur('type')}
+                options={vehicleTypes}
+                isValid={shouldShowValidation('type') ? getFieldValidation('type').isValid : undefined}
+                error={shouldShowValidation('type') ? getFieldValidation('type').error : undefined}
+                warning={shouldShowValidation('type') ? getFieldValidation('type').warning : undefined}
+                showSuccess={shouldShowValidation('type') && getFieldValidation('type').isValid}
+                required
+              />
+
+              {/* Capacity */}
+              <ValidatedInput
+                label="Kapasite (Kişi)"
+                type="number"
+                min="1"
+                max="20"
+                value={formData.capacity}
+                onChange={(e) => updateField('capacity', parseInt(e.target.value) || 1)}
+                onBlur={() => handleFieldBlur('capacity')}
+                isValid={shouldShowValidation('capacity') ? getFieldValidation('capacity').isValid : undefined}
+                error={shouldShowValidation('capacity') ? getFieldValidation('capacity').error : undefined}
+                warning={shouldShowValidation('capacity') ? getFieldValidation('capacity').warning : undefined}
+                showSuccess={shouldShowValidation('capacity') && getFieldValidation('capacity').isValid}
+                required
+              />
+
+              {/* Baggage */}
+              <ValidatedInput
+                label="Bagaj Kapasitesi (Adet)"
+                type="number"
+                min="0"
+                max="20"
+                value={formData.baggage}
+                onChange={(e) => updateField('baggage', parseInt(e.target.value) || 0)}
+                onBlur={() => handleFieldBlur('baggage')}
+                isValid={shouldShowValidation('baggage') ? getFieldValidation('baggage').isValid : undefined}
+                error={shouldShowValidation('baggage') ? getFieldValidation('baggage').error : undefined}
+                warning={shouldShowValidation('baggage') ? getFieldValidation('baggage').warning : undefined}
+                showSuccess={shouldShowValidation('baggage') && getFieldValidation('baggage').isValid}
+                required
+              />
+
+              {/* Price */}
+              <ValidatedInput
+                label="Fiyat (₺/km)"
+                type="number"
+                min="1"
+                step="0.1"
+                value={formData.pricePerKm}
+                onChange={(e) => updateField('pricePerKm', parseFloat(e.target.value) || 1)}
+                onBlur={() => handleFieldBlur('pricePerKm')}
+                isValid={shouldShowValidation('pricePerKm') ? getFieldValidation('pricePerKm').isValid : undefined}
+                error={shouldShowValidation('pricePerKm') ? getFieldValidation('pricePerKm').error : undefined}
+                warning={shouldShowValidation('pricePerKm') ? getFieldValidation('pricePerKm').warning : undefined}
+                showSuccess={shouldShowValidation('pricePerKm') && getFieldValidation('pricePerKm').isValid}
+                required
+              />
+
+              {/* Rating */}
+              <ValidatedInput
+                label="Puan (1.0 - 5.0)"
+                type="number"
+                min="1"
+                max="5"
+                step="0.1"
+                value={formData.rating}
+                onChange={(e) => updateField('rating', parseFloat(e.target.value) || 5.0)}
+                onBlur={() => handleFieldBlur('rating')}
+                isValid={shouldShowValidation('rating') ? getFieldValidation('rating').isValid : undefined}
+                error={shouldShowValidation('rating') ? getFieldValidation('rating').error : undefined}
+                warning={shouldShowValidation('rating') ? getFieldValidation('rating').warning : undefined}
+                showSuccess={shouldShowValidation('rating') && getFieldValidation('rating').isValid}
+                required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-white mb-3">Özellikler</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {commonFeatures.map(feature => (
-                  <label key={feature} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.features.includes(feature)}
-                      onChange={() => handleFeatureToggle(feature)}
-                      className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-white">{feature}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            {/* Image URL */}
+            <ValidatedInput
+              label="Resim URL (İsteğe bağlı)"
+              type="url"
+              value={formData.image}
+              onChange={(e) => updateField('image', e.target.value)}
+              onBlur={() => handleFieldBlur('image')}
+              isValid={shouldShowValidation('image') ? getFieldValidation('image').isValid : undefined}
+              error={shouldShowValidation('image') ? getFieldValidation('image').error : undefined}
+              warning={shouldShowValidation('image') ? getFieldValidation('image').warning : undefined}
+              showSuccess={shouldShowValidation('image') && getFieldValidation('image').isValid}
+              placeholder="https://example.com/image.jpg"
+            />
+
+            {/* Features */}
+            <ValidatedCheckboxGroup
+              label="Araç Özellikleri"
+              options={commonFeatures}
+              selectedValues={formData.features}
+              onChange={(values) => updateField('features', values)}
+              isValid={shouldShowValidation('features') ? getFieldValidation('features').isValid : undefined}
+              error={shouldShowValidation('features') ? getFieldValidation('features').error : undefined}
+              warning={shouldShowValidation('features') ? getFieldValidation('features').warning : undefined}
+              showSuccess={shouldShowValidation('features') && getFieldValidation('features').isValid}
+            />
             
+            {/* Active Status */}
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 id="vehicleActive"
                 checked={formData.isActive}
-                onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                onChange={(e) => updateField('isActive', e.target.checked)}
                 className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500"
               />
               <label htmlFor="vehicleActive" className="text-sm text-white">Aktif araç</label>
             </div>
+
+            {/* Form Validation Summary */}
+            {Object.keys(formErrors).length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4">
+                <h4 className="text-red-400 font-medium mb-2">Form Hataları:</h4>
+                <ul className="text-red-400 text-sm space-y-1">
+                  {Object.entries(formErrors).map(([field, error]) => (
+                    <li key={field}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {Object.keys(formWarnings).length > 0 && (
+              <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-xl p-4">
+                <h4 className="text-yellow-400 font-medium mb-2">Uyarılar:</h4>
+                <ul className="text-yellow-400 text-sm space-y-1">
+                  {Object.entries(formWarnings).map(([field, warning]) => (
+                    <li key={field}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="flex space-x-3 pt-4">
               <button
@@ -491,7 +554,7 @@ export default function AdminVehiclesPage() {
                 onClick={() => {
                   setShowAddModal(false);
                   setShowEditModal(false);
-                  resetForm();
+                  resetFormData();
                 }}
                 className="flex-1 bg-white/10 backdrop-blur-md border border-white/30 text-white px-4 py-3 rounded-xl hover:bg-white/20 transition-all duration-300"
               >
@@ -499,7 +562,12 @@ export default function AdminVehiclesPage() {
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-green-500 to-blue-600 text-white px-4 py-3 rounded-xl hover:from-green-600 hover:to-blue-700 transition-all duration-300"
+                disabled={!isFormValid}
+                className={`flex-1 px-4 py-3 rounded-xl transition-all duration-300 ${
+                  isFormValid 
+                    ? 'bg-gradient-to-r from-green-500 to-blue-600 text-white hover:from-green-600 hover:to-blue-700' 
+                    : 'bg-gray-500/50 text-gray-300 cursor-not-allowed'
+                }`}
               >
                 {showAddModal ? 'Araç Ekle' : 'Güncelle'}
               </button>
