@@ -120,6 +120,38 @@ export class GoogleMapsService {
   }
   
   /**
+   * Rota hesaplama için basitleştirilmiş metod
+   * İki nokta arasındaki mesafe ve süreyi hesaplar
+   */
+  static async calculateRoute(
+    origin: google.maps.LatLngLiteral, 
+    destination: google.maps.LatLngLiteral
+  ): Promise<{ distance: number; duration: number; distanceText: string; durationText: string; } | null> {
+    try {
+      const directionsResult = await this.getDirections(
+        { location: origin },
+        { location: destination }
+      );
+
+      const route = directionsResult.routes[0];
+      if (!route || !route.legs[0]) {
+        return null;
+      }
+
+      const leg = route.legs[0];
+      return {
+        distance: Math.round((leg.distance?.value || 0) / 1000), // km cinsinden
+        duration: Math.round((leg.duration?.value || 0) / 60), // dakika cinsinden
+        distanceText: leg.distance?.text || '',
+        durationText: leg.duration?.text || ''
+      };
+    } catch (error) {
+      console.error('Rota hesaplama hatası:', error);
+      return null;
+    }
+  }
+
+  /**
    * Google Maps tarafından DOM'a eklenen ve React'in kontrolü dışında kalabilen
    * tüm artık elemanları (örn. eski otomatik tamamlama menüleri) zorla temizler.
    * Bu fonksiyon, React bileşenleri unmount olduğunda bir güvenlik ağı olarak kullanılır.
