@@ -108,7 +108,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
         <p className="text-white/70 text-lg">Transfer yönünüzü seçin ve otel bilgilerinizi girin</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Transfer Yönü */}
         <div className="space-y-4">
           <label className="block text-lg font-semibold text-white">Transfer Yönü</label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -139,7 +138,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           </div>
         </div>
         
-        {/* Otel Adı / Konumu */}
         <div className="space-y-4">
           <label className="block text-lg font-semibold text-white">{formData.direction === 'airport-to-hotel' ? 'Otel Adı / Konumu' : 'Kalkış Yeri (Otel)'}</label>
           <GoogleMapsErrorBoundary>
@@ -151,7 +149,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           </GoogleMapsErrorBoundary>
         </div>
         
-        {/* Rota Görüntüleme */}
         <AnimatePresence>
           {hotelPlace && (
             <motion.div
@@ -182,7 +179,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           )}
         </AnimatePresence>
 
-        {/* Tarih ve Saat */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="block text-lg font-semibold text-white">Tarih</label>
@@ -200,7 +196,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           </div>
         </div>
 
-        {/* Yolcu ve Bagaj */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="block text-lg font-semibold text-white">Yolcu Sayısı</label>
@@ -218,7 +213,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
           </div>
         </div>
 
-        {/* İlerle Butonu */}
         <div className="flex justify-end pt-4">
           <button 
             type="submit" 
@@ -241,11 +235,8 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
 function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack, disabled = false }: any) {
     const [selectedVehicle, setSelectedVehicle] = useState('');
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  
-    // Rota daha önce hesaplandıysa onu kullan, yoksa varsayılan bir değer ata
     const [distance, setDistance] = useState(reservationData?.distance || 0);
   
-    // Bu adımda rota tekrar hesaplanırsa mesafeyi güncellemek için
     const handleRouteCalculated = (result: { distance: number }) => {
       const distanceInKm = Math.round(result.distance / 1000);
       if (distanceInKm > 0) {
@@ -304,11 +295,10 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white mb-3">Araç & Fiyat Seçimi</h2>
           <p className="text-white/70 text-lg">
-            Size uygun lüks aracı seçin (Mesafe: {distance > 0 ? `${distance} km` : 'Hesaplanıyor...'}{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''})
+            Mesafe: {distance > 0 ? `${distance} km` : 'Hesaplanıyor...'}{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''}
           </p>
         </div>
         
-        {/* Bu adımda haritayı tekrar göstererek mesafeyi doğrula */}
         <GoogleMapsErrorBoundary>
           <HybridRouteDisplay 
             origin={reservationData.from} 
@@ -319,7 +309,6 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
           />
         </GoogleMapsErrorBoundary>
   
-        {/* Araç Seçim Alanı */}
         <div className="space-y-6">
           <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
             <Car className="h-6 w-6" />
@@ -357,7 +346,6 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
           )}
         </div>
         
-        {/* Ek Hizmetler */}
         {selectedVehicle && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
@@ -390,7 +378,6 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
           </motion.div>
         )}
   
-        {/* Fiyat Özeti */}
         {selectedVehicle && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/10 rounded-2xl p-6">
                 <h3 className="text-xl font-semibold text-white mb-4">Fiyat Özeti</h3>
@@ -416,7 +403,6 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
             </motion.div>
         )}
   
-        {/* Butonlar */}
         <div className="flex justify-between pt-4">
           <button onClick={onBack} disabled={disabled} className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 font-medium flex items-center space-x-2 disabled:opacity-50">
             <ArrowLeft className="h-5 w-5" /><span>Geri</span>
@@ -485,7 +471,7 @@ function CustomerInfoStep({ onNext, onBack, disabled = false }: any) {
 }
 
 // #####################################################################
-// ### 4. ADIM: ÖDEME BİLEŞENİ (YENİ EKLENDİ)                      ###
+// ### 4. ADIM: ÖDEME BİLEŞENİ                                     ###
 // #####################################################################
 function PaymentStep({ reservationData, onNext, onBack, disabled = false }: any) {
     const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
@@ -552,7 +538,6 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
                 <p className="text-white/70 text-lg">Detaylar e-posta adresinize gönderildi.</p>
             </div>
     
-            {/* Rezervasyon Detayları */}
             <div className="bg-white/10 rounded-2xl p-6">
                 <h3 className="text-2xl font-bold mb-6">Rezervasyon Detayları</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -575,7 +560,6 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
                 </div>
             </div>
 
-            {/* QR Kod */}
             {qrCode && (
                 <div className="bg-white/10 rounded-2xl p-6 text-center">
                     <h3 className="text-2xl font-bold mb-4">QR Kodunuz</h3>
@@ -612,31 +596,22 @@ export default function ReservationPage() {
   
     const stepNames = ['Rota', 'Araç', 'Bilgiler', 'Ödeme', 'Onay'];
   
-    // Adımlar arası geçişi güvenli hale getiren fonksiyon
     const safeSetCurrentStep = useCallback(async (newStep: number) => {
       if (isTransitioning || !isMountedRef.current) return;
       
       setIsTransitioning(true);
-      
-      // Google'ın yarattığı artık DOM elemanlarını temizle
       await GoogleMapsService.safeStepTransitionCleanup();
-  
       setCurrentStep(newStep);
       
       setTimeout(() => {
-        if (isMountedRef.current) {
-          setIsTransitioning(false);
-        }
+        if (isMountedRef.current) setIsTransitioning(false);
       }, 400); 
     }, [isTransitioning]);
   
-    // Component yüklendiğinde araç ve servisleri çek
     useEffect(() => {
       isMountedRef.current = true;
       loadInitialData();
-      return () => {
-        isMountedRef.current = false;
-      };
+      return () => { isMountedRef.current = false; };
     }, []);
   
     const loadInitialData = async () => {
@@ -653,8 +628,7 @@ export default function ReservationPage() {
             setServices(servicesData);
         }
       } catch (error) {
-        console.error("Araç veya hizmet verileri yüklenirken hata oluştu:", error);
-        toast.error("Veriler yüklenemedi. Lütfen daha sonra tekrar deneyin.");
+        toast.error("Veriler yüklenemedi.");
       } finally {
         if(isMountedRef.current) {
             setLoadingVehicles(false);
@@ -678,18 +652,21 @@ export default function ReservationPage() {
       safeSetCurrentStep(4);
     };
   
+    // ### BURASI DÜZELTİLDİ ###
     const handlePaymentNext = async (paymentData: any) => {
         setIsTransitioning(true);
         const finalData = { ...reservationData, ...paymentData, status: 'pending' as const, createdAt: new Date().toISOString() };
         
         try {
+            // Önce veritabanına kaydet
             const reservationId = await realTimeReservationService.create(finalData);
             finalData.id = reservationId;
 
-            const [qrCodeUrl, _] = await Promise.all([
-                EmailService.generateQRCode(finalData),
-                EmailService.sendConfirmationEmail(finalData)
-            ]);
+            // Sonra QR kodu oluştur
+            const qrCodeUrl = await EmailService.generateQRCode(finalData);
+            
+            // En son, QR kodu ile birlikte e-postayı gönder (2 argümanlı)
+            await EmailService.sendConfirmationEmail(finalData, qrCodeUrl);
             
             setQrCode(qrCodeUrl);
             setReservationData(finalData);
@@ -697,7 +674,7 @@ export default function ReservationPage() {
             safeSetCurrentStep(5);
 
         } catch (error) {
-            console.error('Rezervasyon oluşturma veya e-posta gönderme hatası:', error);
+            console.error('Rezervasyon veya e-posta hatası:', error);
             toast.error('❌ Rezervasyon oluşturulurken bir hata oluştu.');
             setIsTransitioning(false);
         }
@@ -708,14 +685,11 @@ export default function ReservationPage() {
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
           <div className="absolute inset-0 bg-black/20"></div>
           <header className="relative z-10 p-4">
-              <Link href="/" className="text-white text-xl font-bold">
-                SBS TRAVEL
-              </Link>
+              <Link href="/" className="text-white text-xl font-bold">SBS TRAVEL</Link>
           </header>
           <div className="relative z-10 py-12">
             <div className="max-w-4xl mx-auto p-6">
               <div className="bg-white/5 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8">
-                {/* Adım Göstergesi */}
                 <div className="mb-8">
                   <div className="flex items-center">
                     {stepNames.map((name, index) => (
@@ -732,7 +706,6 @@ export default function ReservationPage() {
                   </div>
                 </div>
                 
-                {/* Adım İçeriği */}
                 <GoogleMapsErrorBoundary>
                   <AnimatePresence mode="wait" initial={false}>
                     {currentStep === 1 && <RouteStep key="route" onNext={handleRouteNext} disabled={isTransitioning} />}
