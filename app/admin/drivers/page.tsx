@@ -35,13 +35,15 @@ export default function AdminDriversPage() {
   const [showEditModal, setShowEditModal] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     licenseNumber: '',
-    vehicleType: '',
-    vehiclePlate: '',
-    isActive: true
+    licenseExpiry: '',
+    experience: 0,
+    languages: [] as string[],
+    status: 'active' as const
   });
 
   useEffect(() => {
@@ -119,13 +121,15 @@ export default function AdminDriversPage() {
 
   const resetForm = () => {
     setFormData({
-      name: '',
+      firstName: '',
+      lastName: '',
       email: '',
       phone: '',
       licenseNumber: '',
-      vehicleType: '',
-      vehiclePlate: '',
-      isActive: true
+      licenseExpiry: '',
+      experience: 0,
+      languages: [],
+      status: 'active'
     });
     setSelectedDriver(null);
   };
@@ -133,13 +137,15 @@ export default function AdminDriversPage() {
   const openEditModal = (driver: Driver) => {
     setSelectedDriver(driver);
     setFormData({
-      name: driver.name,
+      firstName: driver.firstName || '',
+      lastName: driver.lastName || '',
       email: driver.email,
       phone: driver.phone || '',
       licenseNumber: driver.licenseNumber,
-      vehicleType: driver.vehicleType,
-      vehiclePlate: driver.vehiclePlate,
-      isActive: driver.isActive
+      licenseExpiry: driver.licenseExpiry ? new Date(driver.licenseExpiry).toISOString().split('T')[0] : '',
+      experience: driver.experience || 0,
+      languages: driver.languages || [],
+      status: driver.status || 'active'
     });
     setShowEditModal(true);
   };

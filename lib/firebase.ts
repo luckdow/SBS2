@@ -43,21 +43,29 @@ export const isFirebaseConfigured = () => {
          firebaseConfig.authDomain !== "";
 };
 
+// Mock mode for development without real Firebase
+export const isMockMode = () => {
+  return !isFirebaseConfigured() || firebaseConfig.projectId.includes("dev") || firebaseConfig.projectId.includes("example");
+};
+
 // Initialize Firebase only if not already initialized
-let app;
+let app: any;
 try {
   if (getApps().length === 0) {
     if (!validateFirebaseConfig()) {
-      throw new Error('Firebase configuration is incomplete. Please check your environment variables.');
+      console.warn('Firebase configuration is incomplete. Running in mock mode.');
+      // In mock mode, we still initialize Firebase with default values to prevent crashes
+      app = null;
+    } else {
+      app = initializeApp(firebaseConfig);
+      console.log('Firebase initialized successfully');
     }
-    app = initializeApp(firebaseConfig);
-    console.log('Firebase initialized successfully');
   } else {
     app = getApps()[0];
   }
 } catch (error) {
   console.error('Firebase initialization failed:', error);
-  throw error;
+  app = null;
 }
 
 // Initialize Firebase services with error handling
@@ -66,12 +74,22 @@ export let auth: any;
 export let storage: any;
 
 try {
-  db = getFirestore(app);
-  auth = getAuth(app);
-  storage = getStorage(app);
+  if (app && isFirebaseConfigured()) {
+    db = getFirestore(app);
+    auth = getAuth(app);
+    storage = getStorage(app);
+  } else {
+    // Mock services for development
+    console.warn('Running with mock Firebase services');
+    db = null;
+    auth = null;
+    storage = null;
+  }
 } catch (error) {
   console.error('Firebase services initialization failed:', error);
-  throw error;
+  db = null;
+  auth = null;
+  storage = null;
 }
 
 // Development emulator configuration

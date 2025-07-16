@@ -11,46 +11,148 @@ export interface User {
 
 export interface Driver extends User {
   role: 'driver';
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
   licenseNumber: string;
-  vehicleType: string;
-  vehiclePlate: string;
-  isActive: boolean;
-  currentLocation?: {
+  licenseExpiry: Date;
+  experience: number;
+  languages: string[];
+  status: 'active' | 'inactive' | 'suspended';
+  currentVehicle?: string;
+  location?: {
     lat: number;
     lng: number;
+    lastUpdated: Date;
   };
   rating: number;
   totalTrips: number;
-  monthlyEarnings: number;
+  documents: {
+    license: string;
+    background: string;
+    medical: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Customer extends User {
   role: 'customer';
-  totalReservations: number;
-  preferredVehicle?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth?: Date;
+  gender?: 'male' | 'female' | 'other';
+  nationality?: string;
+  address?: {
+    street: string;
+    city: string;
+    state: string;
+    country: string;
+    postalCode: string;
+  };
+  preferences: {
+    language: string;
+    notifications: {
+      email: boolean;
+      sms: boolean;
+      push: boolean;
+    };
+    accessibility: {
+      wheelchair: boolean;
+      assistance: boolean;
+      specialNeeds: string;
+    };
+  };
+  loyaltyPoints: number;
+  totalTrips: number;
+  status: 'active' | 'suspended' | 'pending';
+  documents?: {
+    id: string;
+    passport?: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  lastLoginAt?: Date;
 }
 
 export interface Vehicle {
   id: string;
-  name: string;
-  type: 'sedan' | 'suv' | 'van' | 'luxury';
+  plateNumber: string;
+  type: 'bus' | 'minibus' | 'car';
+  brand: string;
+  model: string;
+  year: number;
   capacity: number;
-  baggage: number;
-  pricePerKm: number;
-  image: string;
   features: string[];
-  rating: number;
-  isActive: boolean;
+  status: 'active' | 'maintenance' | 'retired';
+  location: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+  driver?: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Service {
   id: string;
   name: string;
-  price: number;
   description: string;
-  category: 'child_seat' | 'extra_baggage' | 'meet_greet' | 'other';
-  isActive: boolean;
+  type: 'regular' | 'charter' | 'airport' | 'intercity';
+  route: {
+    origin: {
+      name: string;
+      lat: number;
+      lng: number;
+      address: string;
+    };
+    destination: {
+      name: string;
+      lat: number;
+      lng: number;
+      address: string;
+    };
+    waypoints?: Array<{
+      name: string;
+      lat: number;
+      lng: number;
+      stopDuration: number;
+    }>;
+    distance: number;
+    duration: number;
+  };
+  schedule: {
+    frequency: 'daily' | 'weekly' | 'monthly' | 'on-demand';
+    departureTimes: string[];
+    operatingDays: number[];
+  };
+  pricing: {
+    basePrice: number;
+    currency: string;
+    pricePerKm?: number;
+    discounts?: Array<{
+      type: string;
+      percentage: number;
+      conditions: string;
+    }>;
+  };
+  vehicle: {
+    type: string;
+    minCapacity: number;
+    features: string[];
+  };
+  status: 'active' | 'suspended' | 'maintenance';
+  bookingSettings: {
+    advanceBooking: number;
+    cancellationPolicy: string;
+    requireApproval: boolean;
+  };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Reservation {
