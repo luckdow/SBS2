@@ -99,8 +99,11 @@ export const testFirebaseConnection = async () => {
       throw new Error('Firebase is not properly configured');
     }
     
-    // Test Firestore connection
-    await db._delegate._databaseId;
+    // Test Firestore connection by attempting a simple operation
+    const { doc, getDoc } = await import('firebase/firestore');
+    const testDocRef = doc(db, 'test', 'connection');
+    await getDoc(testDocRef);
+    
     console.log('Firebase connection test successful');
     return true;
   } catch (error) {
