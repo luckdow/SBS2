@@ -7,9 +7,9 @@ const nextConfig = {
   experimental: {
     esmExternals: 'loose',
   },
-  // API anahtarının DOĞRU VE STANDART ADIYLA okunmasını sağlıyoruz.
+  // Google Maps API key configuration
   env: {
-    NEXT_PUBLIC_Maps_API_KEY: process.env.NEXT_PUBLIC_Maps_API_KEY,
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
   },
 };
 

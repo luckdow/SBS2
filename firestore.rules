@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // System settings - Admin only
+    match /settings/{document} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Vehicles - Admin only for write, authenticated users can read
+    match /vehicles/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Drivers - Admin only for write, authenticated users can read
+    match /drivers/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Services - Admin only for write, public read access for booking
+    match /services/{document} {
+      allow read: if true; // Public read for service listings
+      allow write: if isAdmin();
+    }
+    
+    // Customers - Users can read/write their own data, admins can read all
+    match /customers/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated();
+    }
+    
+    // Reservations - Users can read/write their own, admins can read all
+    match /reservations/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+    
+    // Transactions - Users can read their own, admins can read all
+    match /transactions/{document} {
+      allow read: if resource.data.userId == request.auth.uid || isAdmin();
+      allow write: if isAdmin();
+      allow create: if isAuthenticated();
+    }
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}
