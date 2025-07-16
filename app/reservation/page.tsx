@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Clock, Users, Luggage, Plane, MapPin, Star, Check, CheckCircle,
   Download, Mail, Phone, ArrowRight, ArrowLeft, Sparkles, Shield, Car,
-  Navigation, QrCode, CreditCard, Gift, AlertCircle
+  Navigation, QrCode, CreditCard, Gift, AlertCircle, Wallet, Building2
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -32,16 +32,16 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
     baggage: 1,
   });
 
-  const [hotelPlace, setHotelPlace] = useState<google.maps.places.PlaceResult | undefined>();
+  const [hotelPlace, setHotelPlace] = useState<google.maps.places.Place | undefined>();
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; distanceText: string; durationText: string; } | null>(null);
 
   const getFromLocation = () => formData.direction === 'airport-to-hotel' ? 'Antalya Havalimanı' : formData.hotelLocation;
   const getToLocation = () => formData.direction === 'airport-to-hotel' ? formData.hotelLocation : 'Antalya Havalimanı';
 
-  const handleHotelLocationChange = (value: string, place?: google.maps.places.PlaceResult) => {
+  const handleHotelLocationChange = (value: string, place?: google.maps.places.Place) => {
     setFormData(prev => ({ ...prev, hotelLocation: value }));
-    if (place && place.geometry) {
-      setHotelPlace(place);
+    if (place && place.location) {
+      setHotelPlace(place as any); // Type assertion for compatibility
       setRouteInfo(null);
     } else {
       setHotelPlace(undefined);
@@ -476,13 +476,58 @@ function CustomerInfoStep({ onNext, onBack, disabled = false }: any) {
 // ### 4. ADIM: ÖDEME BİLEŞENİ                                     ###
 // #####################################################################
 function PaymentStep({ reservationData, onNext, onBack, disabled = false }: any) {
-    const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
-  
+    const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [paymentSettings, setPaymentSettings] = useState<any>(null);
+    const [loadingSettings, setLoadingSettings] = useState(true);
+    const [showBankDetails, setShowBankDetails] = useState(false);
+
+    useEffect(() => {
+      const loadPaymentSettings = async () => {
+        try {
+          const { settingsService } = await import('../../lib/services/api');
+          const settings = await settingsService.getPaymentSettings();
+          setPaymentSettings(settings);
+          
+          // Set default payment method based on what's available
+          if (settings.cashActive) {
+            setPaymentMethod('cash');
+          } else if (settings.bankTransferActive) {
+            setPaymentMethod('bank-transfer');
+          } else if (settings.creditCardActive) {
+            setPaymentMethod('credit-card');
+          }
+        } catch (error) {
+          console.error('Error loading payment settings:', error);
+          // Fallback to cash only
+          setPaymentSettings({
+            creditCardActive: false,
+            bankTransferActive: false,
+            cashActive: true
+          });
+        } finally {
+          setLoadingSettings(false);
+        }
+      };
+      
+      loadPaymentSettings();
+    }, []);
+
     const handleCompleteReservation = () => {
       if (disabled) return;
       onNext({ paymentMethod });
     };
-  
+
+    if (loadingSettings) {
+      return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+            <span className="text-white">Ödeme seçenekleri yükleniyor...</span>
+          </div>
+        </motion.div>
+      );
+    }
+
     return (
       <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="space-y-8">
         <div className="text-center">
@@ -491,35 +536,163 @@ function PaymentStep({ reservationData, onNext, onBack, disabled = false }: any)
             Toplam Tutar: 
             <span className="font-bold text-yellow-400 ml-2">₺{reservationData?.totalPrice || 0}</span>
           </p>
-        </div>
-  
-        <div className="space-y-4">
-          <label className="block text-lg font-semibold text-white">Ödeme Yöntemi</label>
-          <div
-            onClick={() => setPaymentMethod('cash_on_delivery')}
-            className={`p-6 border-2 rounded-2xl cursor-pointer transition-all ${paymentMethod === 'cash_on_delivery' ? 'border-green-500 bg-green-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'}`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-green-500 p-3 rounded-xl"><CreditCard className="h-6 w-6 text-white" /></div>
-                <div>
-                  <h4 className="font-bold text-white text-lg">Araçta Ödeme</h4>
-                  <p className="text-white/70">Nakit veya kredi kartı ile şoföre ödeyin.</p>
-                </div>
-              </div>
-              {paymentMethod === 'cash_on_delivery' && <CheckCircle className="h-6 w-6 text-green-400" />}
-            </div>
+          <div className="mt-4 bg-blue-500/20 backdrop-blur-md border border-blue-500/50 rounded-xl px-4 py-2 inline-block">
+            <span className="text-blue-200 text-sm">Test modunda çalışıyor - Gerçek ödeme alınmayacak</span>
           </div>
         </div>
-  
+
+        <div className="space-y-4">
+          <label className="block text-lg font-semibold text-white">Ödeme Yöntemi Seçin</label>
+          
+          {/* Nakit Ödeme */}
+          {paymentSettings?.cashActive && (
+            <div
+              onClick={() => setPaymentMethod('cash')}
+              className={`p-6 border-2 rounded-2xl cursor-pointer transition-all ${
+                paymentMethod === 'cash' ? 'border-green-500 bg-green-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-green-500 p-3 rounded-xl">
+                    <Wallet className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-lg">Araçta Nakit Ödeme</h4>
+                    <p className="text-white/70">Şoförünüze nakit olarak ödeyin</p>
+                  </div>
+                </div>
+                {paymentMethod === 'cash' && <CheckCircle className="h-6 w-6 text-green-400" />}
+              </div>
+            </div>
+          )}
+
+          {/* Banka Havalesi */}
+          {paymentSettings?.bankTransferActive && (
+            <div
+              onClick={() => setPaymentMethod('bank-transfer')}
+              className={`p-6 border-2 rounded-2xl cursor-pointer transition-all ${
+                paymentMethod === 'bank-transfer' ? 'border-blue-500 bg-blue-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-blue-500 p-3 rounded-xl">
+                    <Building2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-lg">Banka Havalesi</h4>
+                    <p className="text-white/70">Banka hesabımıza havale/EFT yapın</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowBankDetails(!showBankDetails);
+                    }}
+                    className="text-blue-300 hover:text-blue-200 text-sm underline"
+                  >
+                    {showBankDetails ? 'Gizle' : 'Hesap Bilgileri'}
+                  </button>
+                  {paymentMethod === 'bank-transfer' && <CheckCircle className="h-6 w-6 text-blue-400" />}
+                </div>
+              </div>
+              
+              {showBankDetails && paymentSettings?.bankDetails && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-4 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20"
+                >
+                  <h5 className="font-semibold text-blue-200 mb-3">Banka Hesap Bilgileri</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-white/70">Banka:</span>
+                      <p className="text-white font-medium">{paymentSettings.bankDetails.bankName}</p>
+                    </div>
+                    <div>
+                      <span className="text-white/70">Hesap Sahibi:</span>
+                      <p className="text-white font-medium">{paymentSettings.bankDetails.accountHolder}</p>
+                    </div>
+                    <div>
+                      <span className="text-white/70">IBAN:</span>
+                      <p className="text-white font-medium font-mono">{paymentSettings.bankDetails.iban}</p>
+                    </div>
+                    <div>
+                      <span className="text-white/70">Hesap No:</span>
+                      <p className="text-white font-medium">{paymentSettings.bankDetails.accountNumber}</p>
+                    </div>
+                    {paymentSettings.bankDetails.swiftCode && (
+                      <div>
+                        <span className="text-white/70">Swift Kodu:</span>
+                        <p className="text-white font-medium">{paymentSettings.bankDetails.swiftCode}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
+                    <p className="text-yellow-200 text-sm">
+                      💡 <strong>Önemli:</strong> Havale açıklamasına rezervasyon numaranızı yazınız.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {/* Kredi Kartı */}
+          {paymentSettings?.creditCardActive && (
+            <div
+              onClick={() => setPaymentMethod('credit-card')}
+              className={`p-6 border-2 rounded-2xl cursor-pointer transition-all ${
+                paymentMethod === 'credit-card' ? 'border-purple-500 bg-purple-500/20' : 'border-white/30 bg-white/10 hover:border-white/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-purple-500 p-3 rounded-xl">
+                    <CreditCard className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-lg">Kredi Kartı</h4>
+                    <p className="text-white/70">Güvenli ödeme ile anında onay</p>
+                    <div className="mt-1">
+                      <span className="bg-yellow-500/20 text-yellow-200 text-xs px-2 py-1 rounded">Test Modu</span>
+                    </div>
+                  </div>
+                </div>
+                {paymentMethod === 'credit-card' && <CheckCircle className="h-6 w-6 text-purple-400" />}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Ödeme yöntemi seçilmediğinde uyarı */}
+        {!paymentSettings?.cashActive && !paymentSettings?.bankTransferActive && !paymentSettings?.creditCardActive && (
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Ödeme Yöntemi Bulunamadı</h3>
+            <p className="text-white/70">Şu anda aktif ödeme yöntemi bulunmamaktadır. Lütfen daha sonra tekrar deneyin.</p>
+          </div>
+        )}
+
         <div className="flex justify-between pt-4">
-          <button type="button" onClick={onBack} disabled={disabled} className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 font-medium flex items-center space-x-2 disabled:opacity-50">
+          <button 
+            type="button" 
+            onClick={onBack} 
+            disabled={disabled} 
+            className="group px-6 py-3 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 font-medium flex items-center space-x-2 disabled:opacity-50"
+          >
             <ArrowLeft className="h-5 w-5" />
             <span>Geri</span>
           </button>
-          <button onClick={handleCompleteReservation} disabled={disabled} className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all shadow-lg flex items-center space-x-2 disabled:opacity-50">
+          <button 
+            onClick={handleCompleteReservation} 
+            disabled={disabled || (!paymentSettings?.cashActive && !paymentSettings?.bankTransferActive && !paymentSettings?.creditCardActive)} 
+            className="group relative px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-blue-700 transition-all shadow-lg flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <CheckCircle className="h-5 w-5" />
-            <span>Rezervasyonu Onayla</span>
+            <span>Rezervasyonu Tamamla</span>
           </button>
         </div>
       </motion.div>
@@ -530,14 +703,214 @@ function PaymentStep({ reservationData, onNext, onBack, disabled = false }: any)
 // ### 5. ADIM: ONAY BİLEŞENİ                                      ###
 // #####################################################################
 function ConfirmationStep({ reservationData, qrCode }: any) {
+    const [customerCredentials, setCustomerCredentials] = useState<{ email: string; tempPassword: string } | null>(null);
+
+    useEffect(() => {
+      // Extract customer credentials from reservationData if available
+      if (reservationData?.customerCredentials) {
+        setCustomerCredentials(reservationData.customerCredentials);
+      }
+    }, [reservationData]);
+
+    const downloadQRCode = () => {
+      if (!qrCode) return;
+      const link = document.createElement('a');
+      link.download = `SBS-QR-${reservationData?.id || Date.now()}.png`;
+      link.href = qrCode;
+      link.click();
+    };
+
     return (
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8">
             <div className="text-center">
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }} className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full mb-6 shadow-2xl"><CheckCircle className="h-10 w-10 text-white" /></motion.div>
-                <h2 className="text-4xl font-bold text-white mb-3"><span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">Rezervasyonunuz Tamamlandı!</span></h2>
+                <motion.div 
+                  initial={{ scale: 0 }} 
+                  animate={{ scale: 1 }} 
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }} 
+                  className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full mb-6 shadow-2xl"
+                >
+                  <CheckCircle className="h-10 w-10 text-white" />
+                </motion.div>
+                <h2 className="text-4xl font-bold text-white mb-3">
+                  <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                    Rezervasyonunuz Tamamlandı!
+                  </span>
+                </h2>
                 <p className="text-white/70 text-lg">Rezervasyon bilgileriniz e-posta adresinize gönderildi.</p>
+                <div className="mt-4 bg-green-500/20 backdrop-blur-md border border-green-500/50 rounded-xl px-6 py-3 inline-block">
+                  <span className="text-green-200 font-semibold">Rezervasyon No: #{reservationData?.id}</span>
+                </div>
             </div>
-            {/* Diğer onay detayları... */}
+
+            {/* Reservation Details */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.4 }}
+              className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6"
+            >
+              <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
+                <Car className="h-6 w-6" />
+                <span>Rezervasyon Detayları</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-white/70">Rota:</span>
+                  <p className="text-white font-medium">{reservationData?.from} → {reservationData?.to}</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Tarih & Saat:</span>
+                  <p className="text-white font-medium">{reservationData?.date} - {reservationData?.time}</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Yolcu:</span>
+                  <p className="text-white font-medium">{reservationData?.passengers} kişi</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Bagaj:</span>
+                  <p className="text-white font-medium">{reservationData?.baggage} adet</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Araç:</span>
+                  <p className="text-white font-medium">{reservationData?.vehicle?.name}</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Toplam Tutar:</span>
+                  <p className="text-white font-bold text-lg text-green-400">₺{reservationData?.totalPrice}</p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* QR Code Section */}
+            {qrCode && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ delay: 0.6 }}
+                className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-md border border-blue-500/50 rounded-2xl p-6 text-center"
+              >
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center justify-center space-x-2">
+                  <QrCode className="h-6 w-6" />
+                  <span>QR Kodunuz</span>
+                </h3>
+                <div className="bg-white p-4 rounded-xl inline-block mb-4 shadow-lg">
+                  <img src={qrCode} alt="Rezervasyon QR Kodu" className="w-48 h-48 mx-auto" />
+                </div>
+                <p className="text-blue-200 mb-4">Bu QR kodu şoförünüze gösterin</p>
+                <button
+                  onClick={downloadQRCode}
+                  className="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>QR Kodu İndir</span>
+                </button>
+              </motion.div>
+            )}
+
+            {/* Customer Account Information */}
+            {customerCredentials && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ delay: 0.8 }}
+                className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-md border border-purple-500/50 rounded-2xl p-6"
+              >
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
+                  <Users className="h-6 w-6" />
+                  <span>Müşteri Hesabınız Oluşturuldu</span>
+                </h3>
+                <div className="bg-white/10 rounded-xl p-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-white/70">E-posta:</span>
+                      <p className="text-white font-medium">{customerCredentials.email}</p>
+                    </div>
+                    <div>
+                      <span className="text-white/70">Geçici Şifre:</span>
+                      <p className="text-white font-medium font-mono">{customerCredentials.tempPassword}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 mb-4">
+                  <p className="text-yellow-200 text-sm">
+                    💡 <strong>Önemli:</strong> Bu bilgileri güvenli bir yerde saklayın. İlk girişinizde şifrenizi değiştirebilirsiniz.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center space-x-2 text-green-200 text-sm">
+                    <Check className="h-4 w-4" />
+                    <span>Daha hızlı rezervasyon</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-green-200 text-sm">
+                    <Check className="h-4 w-4" />
+                    <span>Rezervasyon geçmişi</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-green-200 text-sm">
+                    <Check className="h-4 w-4" />
+                    <span>Özel indirimler</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-green-200 text-sm">
+                    <Check className="h-4 w-4" />
+                    <span>Sadakat puanları</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Important Information */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 1.0 }}
+              className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-md border border-orange-500/50 rounded-2xl p-6"
+            >
+              <h3 className="text-xl font-semibold text-white mb-4 flex items-center space-x-2">
+                <Shield className="h-6 w-6" />
+                <span>Önemli Bilgiler</span>
+              </h3>
+              <div className="space-y-3 text-sm text-orange-100">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>Şoförünüz size WhatsApp üzerinden iletişim kuracak</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>Yolculuk zamanından 30 dakika önce arayacağız</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>QR kodunuzu şoföre gösterdikten sonra yolculuk başlayacak</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>Acil durumlar için: <a href="tel:+905321234567" className="text-orange-300 hover:text-orange-200 underline">+90 532 123 4567</a></p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Action Buttons */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 1.2 }}
+              className="flex flex-col sm:flex-row gap-4 pt-4"
+            >
+              <Link 
+                href="/customer" 
+                className="flex-1 group relative px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2"
+              >
+                <Users className="h-5 w-5" />
+                <span>Müşteri Panelime Git</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-500 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
+              </Link>
+              <Link 
+                href="/" 
+                className="flex-1 group px-8 py-4 border-2 border-white/30 text-white rounded-xl hover:bg-white/10 font-semibold transition-all duration-300 flex items-center justify-center space-x-2"
+              >
+                <MapPin className="h-5 w-5" />
+                <span>Ana Sayfa</span>
+              </Link>
+            </motion.div>
         </motion.div>
     );
 }
@@ -614,25 +987,66 @@ export default function ReservationPage() {
       safeSetCurrentStep(4);
     };
   
-    // ### BURASI SON HATAYI DÜZELTMEK İÇİN GÜNCELLENDİ ###
+    // ### UPDATED: Enhanced payment completion with automatic user registration ###
     const handlePaymentNext = async (paymentData: any) => {
         setIsTransitioning(true);
         const finalData = { ...reservationData, ...paymentData, status: 'pending' as const, createdAt: new Date().toISOString() };
         
         try {
-            // Önce veritabanına kaydet
+            // Step 1: Create automatic user account
+            let customerCredentials = null;
+            try {
+                // Generate a temporary password for the customer
+                const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
+                
+                // Import auth service dynamically to avoid SSR issues
+                const { AuthService } = await import('../../lib/services/authService');
+                
+                // Create user account with email and temporary password
+                const user = await AuthService.createAccountWithEmail(
+                    finalData.email,
+                    tempPassword,
+                    `${finalData.firstName} ${finalData.lastName}`
+                );
+                
+                if (user) {
+                    customerCredentials = {
+                        email: finalData.email,
+                        tempPassword: tempPassword
+                    };
+                    finalData.customerId = user.uid;
+                    console.log('✅ Customer account created successfully:', user.uid);
+                } else {
+                    console.warn('⚠️ Customer account creation returned null');
+                }
+            } catch (authError) {
+                console.error('❌ Customer account creation failed:', authError);
+                // Continue with reservation even if account creation fails
+                toast.error('Hesap oluşturulamadı, ancak rezervasyonunuz kaydedildi.');
+            }
+
+            // Step 2: Save reservation to database
             const reservationId = await realTimeReservationService.create(finalData);
             finalData.id = reservationId;
 
-            // Sonra QR kodu oluştur
+            // Step 3: Generate QR code
             const qrCodeUrl = await EmailService.generateQRCode(finalData);
             
-            // En son, QR kodu ile birlikte e-postayı gönder (2 argümanlı doğru çağrı)
+            // Step 4: Send confirmation email with QR code
             await EmailService.sendConfirmationEmail(finalData, qrCodeUrl);
             
+            // Step 5: Update final data with customer credentials and proceed
             setQrCode(qrCodeUrl);
+            if (customerCredentials) {
+                finalData.customerCredentials = customerCredentials;
+            }
             setReservationData(finalData);
+            
             toast.success('🎉 Rezervasyonunuz başarıyla oluşturuldu!');
+            if (customerCredentials) {
+                toast.success('✨ Müşteri hesabınız otomatik olarak oluşturuldu!');
+            }
+            
             safeSetCurrentStep(5);
 
         } catch (error) {
