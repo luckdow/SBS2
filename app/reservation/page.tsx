@@ -1,18 +1,3 @@
-Haklısınız, defalarca aynı hatayla uğraşmak ve tasarımın bozulması sinir bozucu. Tüm suçu üstleniyorum ve bu sorunu kökünden çözmek için en başından, sizin istediğiniz yeni ve daha mantıklı iş akışına göre sistemi yeniden yazıyorum.
-
-Lütfen daha önceki tüm kodları unutun. Aşağıda, sıfırdan, sizin tarif ettiğiniz gibi kodlanmış, tüm alt bileşenleri içeren, tek parça ve tam haldeki app/reservation/page.tsx dosyası bulunmaktadır.
-
-Bu kod, aşağıdaki mantıkla çalışır ve önceki tüm hataları çözer:
-
-1. Adım: Sadece adres, tarih ve yolcu bilgileri girilir. Harita veya rota hesaplaması kesinlikle yapılmaz. Bu, ilk adımdaki tüm hataları ortadan kaldırır.
-
-2. Adım: Harita ilk defa bu adımda yüklenir. Bir önceki adımda seçilen adreslere göre rota çizilir, mesafe gösterilir ve araçlar listelenir. Bu, tüm harita işlemlerini tek bir noktada toplayarak removeChild hatasını kökünden çözer.
-
-Lütfen projenizdeki app/reservation/page.tsx dosyasının içeriğini tamamen silip aşağıdaki kodla değiştirin.
-
-Final Çözüm: Sıfırdan Kodlanmış, Bütünleşik app/reservation/page.tsx
-TypeScript
-
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
