@@ -284,7 +284,7 @@ export default function AdminDashboard() {
             </div>
 
             <nav className="hidden md:flex items-center space-x-8">
-              <Link href="/admin" className="text-white font-medium">Dashboard</Link>
+              <Link href="/admin/dashboard" className="text-white font-medium">Dashboard</Link>
               <Link href="/admin/reservations" className="text-white/70 hover:text-white font-medium transition-colors">Rezervasyonlar</Link>
               <Link href="/admin/vehicles" className="text-white/70 hover:text-white font-medium transition-colors">Araçlar</Link>
               <Link href="/admin/drivers" className="text-white/70 hover:text-white font-medium transition-colors">Şoförler</Link>
