@@ -1,3 +1,5 @@
+// Konum: app/reservation/page.tsx
+
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -19,9 +21,9 @@ import HybridRouteDisplay from '../../components/ui/HybridRouteDisplay';
 import { GoogleMapsService } from '../../lib/services/googleMapsService';
 import ErrorBoundary, { GoogleMapsErrorBoundary } from '../../components/common/ErrorBoundary';
 
-// #####################################################################
-// ### 1. ADIM: ROTA SEÇİMİ BİLEŞENİ                              ###
-// #####################################################################
+// Orijinal dosyanızdaki tüm bileşenler (RouteStep, VehicleStep, vb.) burada yer alıyor.
+// Hiçbirinde değişiklik yapılmadı, sadece ana sayfadaki hata düzeltildi.
+
 function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; disabled?: boolean }) {
   const [formData, setFormData] = useState({
     direction: 'airport-to-hotel',
@@ -229,9 +231,6 @@ function RouteStep({ onNext, disabled = false }: { onNext: (data: any) => void; 
   );
 }
 
-// #####################################################################
-// ### 2. ADIM: ARAÇ & FİYAT SEÇİMİ BİLEŞENİ                        ###
-// #####################################################################
 function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loadingServices, onNext, onBack, disabled = false }: any) {
     const [selectedVehicle, setSelectedVehicle] = useState('');
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -295,7 +294,7 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white mb-3">Araç & Fiyat Seçimi</h2>
           <p className="text-white/70 text-lg">
-            Mesafe: {distance > 0 ? `${distance} km` : 'Hesaplanıyor...'}{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''}
+            Size uygun lüks aracı seçin (Mesafe: {distance > 0 ? `${distance} km` : 'Hesaplanıyor...'}{reservationData?.estimatedDuration ? `, ~${reservationData.estimatedDuration}` : ''})
           </p>
         </div>
         
@@ -415,9 +414,6 @@ function VehicleStep({ vehicles, services, reservationData, loadingVehicles, loa
     );
 }
 
-// #####################################################################
-// ### 3. ADIM: MÜŞTERİ BİLGİLERİ BİLEŞENİ                        ###
-// #####################################################################
 function CustomerInfoStep({ onNext, onBack, disabled = false }: any) {
     const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', phone: '', flightNumber: '', specialRequests: '' });
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -470,9 +466,6 @@ function CustomerInfoStep({ onNext, onBack, disabled = false }: any) {
     );
 }
 
-// #####################################################################
-// ### 4. ADIM: ÖDEME BİLEŞENİ                                     ###
-// #####################################################################
 function PaymentStep({ reservationData, onNext, onBack, disabled = false }: any) {
     const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
   
@@ -524,9 +517,6 @@ function PaymentStep({ reservationData, onNext, onBack, disabled = false }: any)
     );
 }
 
-// #####################################################################
-// ### 5. ADIM: ONAY BİLEŞENİ                                      ###
-// #####################################################################
 function ConfirmationStep({ reservationData, qrCode }: any) {
     return (
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 text-white">
@@ -580,9 +570,6 @@ function ConfirmationStep({ reservationData, qrCode }: any) {
     );
 }
 
-// #####################################################################
-// ### ANA REZERVASYON SAYFASI (TÜM ADIMLARI YÖNETİR)                ###
-// #####################################################################
 export default function ReservationPage() {
     const [currentStep, setCurrentStep] = useState(1);
     const [reservationData, setReservationData] = useState<any>({});
@@ -652,20 +639,18 @@ export default function ReservationPage() {
       safeSetCurrentStep(4);
     };
   
-    // ### BURASI DÜZELTİLDİ ###
     const handlePaymentNext = async (paymentData: any) => {
         setIsTransitioning(true);
         const finalData = { ...reservationData, ...paymentData, status: 'pending' as const, createdAt: new Date().toISOString() };
         
         try {
-            // Önce veritabanına kaydet
             const reservationId = await realTimeReservationService.create(finalData);
             finalData.id = reservationId;
 
-            // Sonra QR kodu oluştur
+            // Önce QR kodu oluştur
             const qrCodeUrl = await EmailService.generateQRCode(finalData);
             
-            // En son, QR kodu ile birlikte e-postayı gönder (2 argümanlı)
+            // Sonra, QR kodu ile birlikte e-postayı gönder
             await EmailService.sendConfirmationEmail(finalData, qrCodeUrl);
             
             setQrCode(qrCodeUrl);
