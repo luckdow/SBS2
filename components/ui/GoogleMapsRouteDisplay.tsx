@@ -7,8 +7,8 @@ import { GoogleMapsService } from '../../lib/services/googleMapsService';
 interface GoogleMapsRouteDisplayProps {
   origin: string;
   destination: string;
-  originPlace?: google.maps.places.PlaceResult;
-  destinationPlace?: google.maps.places.PlaceResult;
+  originPlace?: google.maps.places.PlaceResult | google.maps.places.Place;
+  destinationPlace?: google.maps.places.PlaceResult | google.maps.places.Place;
   onRouteCalculated?: (result: {
     distance: number;
     duration: number;
@@ -71,10 +71,23 @@ export default function GoogleMapsRouteDisplay({
       }
 
       // Rotayı hesapla
-      const result = await GoogleMapsService.getDirections(
-        originPlace?.geometry?.location || origin,
-        destinationPlace?.geometry?.location || destination
-      );
+      // PlaceResult ve Place tiplerinin geometry/location özelliklerini doğru şekilde handle ediyoruz
+      const getLocationFromPlace = (place: google.maps.places.PlaceResult | google.maps.places.Place) => {
+        // PlaceResult için geometry.location
+        if ('geometry' in place && place.geometry?.location) {
+          return { location: place.geometry.location };
+        }
+        // Place için location özelliği
+        if ('location' in place && place.location) {
+          return { location: place.location };
+        }
+        return null;
+      };
+
+      const originParam = originPlace ? getLocationFromPlace(originPlace) || { placeId: origin } : { placeId: origin };
+      const destinationParam = destinationPlace ? getLocationFromPlace(destinationPlace) || { placeId: destination } : { placeId: destination };
+
+      const result = await GoogleMapsService.getDirections(originParam, destinationParam);
 
       // Son güvenlik kontrolü
       if (!isMountedRef.current || !directionsRendererRef.current) return;

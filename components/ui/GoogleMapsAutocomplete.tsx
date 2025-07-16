@@ -102,7 +102,7 @@ export default function GoogleMapsAutocomplete({
     <gmp-place-autocomplete
       ref={autocompleteRef}
       // Google'ın web bileşenine doğrudan stil ve diğer özellikleri aktarıyoruz.
-      class={`w-full pl-12 pr-10 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/50 transition-all ${className}`}
+      className={`w-full pl-12 pr-10 py-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-white/60 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/50 transition-all ${className}`}
       placeholder={placeholder}
       // Arama yapılacak ülkeyi ve döndürülecek veri alanlarını belirtiyoruz.
       country-codes="TR"
