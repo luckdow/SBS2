@@ -1,18 +1,33 @@
-// luckdow/sbs2/SBS2-093e6f6df387c76e0b5effe7975991d315ee6e55/lib/services/googleMapsService.ts
-
 /**
- * GoogleMapsService - SIFIRDAN YAZILMIŞ KARARLI SÜRÜM
+ * GoogleMapsService - FİNAL SÜRÜM
  *
- * Bu servis, "importLibrary" veya "getDirections" gibi fonksiyonların eksik olma
- * hatalarını tamamen gidermek için tasarlanmıştır. Kütüphaneleri en stabil yöntemle yükler.
+ * Bu servis, modern özellikleri desteklemek ve versiyon uyumsuzluklarını
+ * gidermek için Google Maps API'nin 'beta' kanalını kullanır.
  */
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
 
   /**
-   * Google Maps API script'ini, kütüphanelerle birlikte güvenli bir şekilde yükler.
-   * Bu fonksiyon, tüm Google Maps işlemlerinden önce çağrılmalıdır.
+   * Gerekli Google Maps kütüphanelerini asenkron olarak yükler.
+   */
+  private static async loadLibraries(): Promise<void> {
+    try {
+      // Gerekli tüm kütüphaneleri tek seferde yükle
+      await Promise.all([
+        google.maps.importLibrary("places"),
+        google.maps.importLibrary("geometry"),
+        google.maps.importLibrary("routes"),
+      ]);
+      console.log('✅ Google Maps "places", "geometry" ve "routes" kütüphaneleri başarıyla yüklendi.');
+    } catch (e) {
+      console.error('❌ Google Maps kütüphaneleri yüklenemedi:', e);
+      throw new Error('Gerekli Google Haritalar kütüphaneleri yüklenemedi.');
+    }
+  }
+
+  /**
+   * Google Maps API script'ini, eğer daha önce yüklenmediyse, güvenli bir şekilde sayfaya ekler.
    */
   static loadGoogleMaps(): Promise<typeof window.google> {
     if (this.loadPromise) {
@@ -20,13 +35,13 @@ export class GoogleMapsService {
     }
 
     this.loadPromise = new Promise((resolve, reject) => {
-      // Script zaten yüklenmiş mi diye kontrol et
-      if (typeof window.google?.maps?.places !== 'undefined') {
-        console.log('✅ Google Maps ve kütüphaneleri zaten yüklü.');
-        return resolve(window.google);
+      // Beta versiyonun getirdiği importLibrary fonksiyonu var mı diye kontrol et
+      if (typeof window.google?.maps?.importLibrary === 'function') {
+        console.log('✅ Google Maps (beta) zaten yüklü.');
+        this.loadLibraries().then(() => resolve(window.google)).catch(reject);
+        return;
       }
 
-      // API anahtarının varlığını kontrol et
       if (!this.apiKey) {
         const errorMsg = 'Google Haritalar API anahtarı bulunamadı. Lütfen NEXT_PUBLIC_Maps_API_KEY değişkenini Vercel proje ayarlarınıza ekleyin.';
         console.error(errorMsg);
@@ -35,31 +50,31 @@ export class GoogleMapsService {
 
       const scriptId = 'google-maps-script';
       if (document.getElementById(scriptId)) {
-        console.warn('Google Maps scripti DOM\'da mevcut ama henüz tam yüklenmemiş. Bekleniyor...');
+        // Script zaten varsa ama henüz yüklenmemişse bekle
+        console.warn('Google Maps scripti zaten yükleniyor, tamamlanması bekleniyor...');
         setTimeout(() => {
-          if (window.google?.maps?.places) {
-            resolve(window.google);
-          } else {
-            reject(new Error('Mevcut Google Haritalar scripti yüklenemedi.'));
-          }
-        }, 1000); // 1 saniye bekle ve tekrar kontrol et
+            if (typeof window.google?.maps?.importLibrary === 'function') {
+                this.loadLibraries().then(() => resolve(window.google)).catch(reject);
+            } else {
+                reject(new Error('Mevcut Google Haritalar scripti yüklenemedi veya beta sürüm değil.'));
+            }
+        }, 1500);
         return;
       }
       
       const script = document.createElement('script');
       script.id = scriptId;
-      // Kütüphaneler (places, geometry, routes) doğrudan URL'den istenir. Bu en kararlı yöntemdir.
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry,routes&language=tr&region=TR`;
+      // Modern fonksiyonları kullanmak için API'nin BETA versiyonunu istiyoruz.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&v=beta&loading=async&language=tr&region=TR`;
       script.async = true;
-      script.defer = true;
       
       script.onload = () => {
-        console.log('✅ Google Maps ana scripti ve kütüphaneleri başarıyla yüklendi.');
-        resolve(window.google);
+        console.log('✅ Google Maps ana scripti (beta) başarıyla yüklendi.');
+        this.loadLibraries().then(() => resolve(window.google)).catch(reject);
       };
       
       script.onerror = (e) => {
-        console.error('❌ Google Haritalar scripti yüklenemedi. API anahtarınızı ve Google Cloud ayarlarınızı kontrol edin.', e);
+        console.error('❌ Google Haritalar scripti yüklenemedi.', e);
         this.loadPromise = null;
         document.getElementById(scriptId)?.remove();
         reject(new Error('Google Haritalar scripti yüklenemedi.'));
@@ -70,45 +85,34 @@ export class GoogleMapsService {
 
     return this.loadPromise;
   }
-
+  
   /**
    * İki nokta arasında yol tarifi, mesafe ve süre bilgilerini hesaplar.
    */
   static async getDirections(origin: string | google.maps.LatLng, destination: string | google.maps.LatLng): Promise<google.maps.DirectionsResult> {
-    await this.loadGoogleMaps(); // API'nin yüklendiğinden emin ol
+    await this.loadGoogleMaps();
     const directionsService = new google.maps.DirectionsService();
     return new Promise((resolve, reject) => {
-      directionsService.route(
-        {
-          origin,
-          destination,
-          travelMode: google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK && result) {
+      directionsService.route({ 
+        origin, 
+        destination, 
+        travelMode: google.maps.TravelMode.DRIVING 
+      }, (result, status) => {
+        if (status === 'OK' && result) {
             resolve(result);
-          } else {
-            reject(new Error(`Directions isteği başarısız oldu: ${status}`));
-          }
+        } else {
+            reject(new Error(`Directions isteği başarısız: ${status}`));
         }
-      );
+      });
     });
   }
 
   /**
    * Component geçişlerinde "ghost" elementleri temizleyerek DOM hatalarını önler.
    */
-  static async safeStepTransitionCleanup(delay = 200): Promise<void> {
-    const selectors = '.pac-container, .gmnoprint';
-    const elements = document.querySelectorAll(selectors);
-    
-    elements.forEach(el => {
-      if (el && el.parentNode) {
-        el.parentNode.removeChild(el);
-      }
-    });
-
-    // DOM'un güncellenmesi için kısa bir gecikme
+  static async safeStepTransitionCleanup(delay = 100): Promise<void> {
+    // Otomatik tamamlama listelerini ve diğer olası artıkları temizle
+    document.querySelectorAll('.pac-container, .gmnoprint').forEach(el => el.remove());
     return new Promise(resolve => setTimeout(resolve, delay));
   }
 }
