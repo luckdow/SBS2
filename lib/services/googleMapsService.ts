@@ -1,26 +1,14 @@
+// Konum: lib/services/googleMapsService.ts
+
 /**
- * GoogleMapsService - FİNAL SÜRÜM (Tüm Hatalar İçin Düzeltildi)
+ * GoogleMapsService - STABİL SÜRÜM
  *
- * Bu servis, modern özellikleri desteklemek için 'beta' kanalını kullanır
- * ve projedeki tüm bileşenlerle uyumlu olacak şekilde tasarlanmıştır.
+ * Bu sürüm, "importLibrary" hatasını kesin olarak çözmek için kütüphaneleri
+ * doğrudan script URL'si üzerinden, en kararlı ve klasik yöntemle yükler.
  */
 export class GoogleMapsService {
   private static loadPromise: Promise<typeof window.google> | null = null;
   private static apiKey = process.env.NEXT_PUBLIC_Maps_API_KEY;
-
-  private static async loadLibraries(): Promise<void> {
-    try {
-      await Promise.all([
-        google.maps.importLibrary("places"),
-        google.maps.importLibrary("geometry"),
-        google.maps.importLibrary("routes"),
-      ]);
-      console.log('✅ Google Maps "places", "geometry", "routes" kütüphaneleri yüklendi.');
-    } catch (e) {
-      console.error('❌ Google Maps kütüphaneleri yüklenemedi:', e);
-      throw new Error('Gerekli Google Haritalar kütüphaneleri yüklenemedi.');
-    }
-  }
 
   static loadGoogleMaps(): Promise<typeof window.google> {
     if (this.loadPromise) {
@@ -28,36 +16,36 @@ export class GoogleMapsService {
     }
 
     this.loadPromise = new Promise((resolve, reject) => {
-      if (typeof window.google?.maps?.importLibrary === 'function') {
-        this.loadLibraries().then(() => resolve(window.google)).catch(reject);
-        return;
+      // Scriptin ve kütüphanelerin zaten yüklenip yüklenmediğini kontrol et
+      if (typeof window.google?.maps?.places !== 'undefined') {
+        return resolve(window.google);
       }
 
       if (!this.apiKey) {
-        const errorMsg = 'API anahtarı bulunamadı. NEXT_PUBLIC_Maps_API_KEY değişkenini kontrol edin.';
-        return reject(new Error(errorMsg));
+        return reject(new Error('API anahtarı bulunamadı. NEXT_PUBLIC_Maps_API_KEY ayarını kontrol edin.'));
       }
-      
+
       const scriptId = 'google-maps-script';
       if (document.getElementById(scriptId)) {
+        // Script zaten varsa ama yüklenmemişse, bir süre bekle
         setTimeout(() => {
-            if (typeof window.google?.maps?.importLibrary === 'function') {
-                this.loadLibraries().then(() => resolve(window.google)).catch(reject);
-            } else {
-                reject(new Error('Mevcut Google Haritalar scripti yüklenemedi.'));
-            }
-        }, 1500);
+          if (window.google?.maps?.places) {
+            resolve(window.google);
+          } else {
+            reject(new Error('Mevcut Google Haritalar scripti yüklenemedi.'));
+          }
+        }, 1000);
         return;
       }
       
       const script = document.createElement('script');
       script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&v=beta&loading=async&language=tr&region=TR`;
+      // Kütüphaneler (places, geometry, routes) doğrudan URL'de istenir. Beta kanalı kullanılmaz.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry,routes&language=tr&region=TR`;
       script.async = true;
+      script.defer = true;
       
-      script.onload = () => {
-        this.loadLibraries().then(() => resolve(window.google)).catch(reject);
-      };
+      script.onload = () => resolve(window.google);
       
       script.onerror = (e) => {
         this.loadPromise = null;
@@ -74,31 +62,20 @@ export class GoogleMapsService {
     await this.loadGoogleMaps();
     const directionsService = new google.maps.DirectionsService();
     return new Promise((resolve, reject) => {
-      directionsService.route({ 
-        origin, 
-        destination, 
-        travelMode: google.maps.TravelMode.DRIVING 
-      }, (result, status) => {
-        if (status === 'OK' && result) {
-            resolve(result);
-        } else {
-            reject(new Error(`Directions isteği başarısız: ${status}`));
-        }
+      directionsService.route({ origin, destination, travelMode: google.maps.TravelMode.DRIVING }, (result, status) => {
+        if (status === 'OK' && result) resolve(result);
+        else reject(new Error(`Directions isteği başarısız: ${status}`));
       });
     });
   }
-
-  /**
-   * ### YENİDEN EKLENDİ ###
-   * GoogleMapsProvider tarafından kullanılan eski temizlik fonksiyonu.
-   * Bu fonksiyon, 'forceCleanupAllGoogleMapsElements does not exist' hatasını çözer.
-   */
+  
+  // Bu fonksiyon hem Provider hem de safeStepTransitionCleanup tarafından kullanılabilir.
   static forceCleanupAllGoogleMapsElements() {
     document.querySelectorAll('.pac-container, .gmnoprint').forEach(el => el.remove());
   }
-  
+
   static async safeStepTransitionCleanup(delay = 100): Promise<void> {
-    this.forceCleanupAllGoogleMapsElements(); // Artık bu fonksiyonu güvenle çağırabiliriz.
+    this.forceCleanupAllGoogleMapsElements();
     return new Promise(resolve => setTimeout(resolve, delay));
   }
 }
